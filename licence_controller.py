@@ -198,19 +198,18 @@ def validate():
                 value["software_name"] = key.split("@")[0].split('_')[0]        
                 log.warning(key + " software_name set to " + value["software_name"])
 
-            if not value["feature"]:
-                value["feature"] = key.split("@")[0].split('_')[0]
+            if not value["feature"] and len(key.split("@")[0].split('_')[1])>1:
+                value["feature"] = key.split("@")[0].split('_')[1]
                 log.warning(key + " feature set to " + value["feature"])
 
+            if key.len(split("@"))>1:
+                if not value["institution"] 
+                    value["institution"] = key.split("@")[1].split('_')[0]
+                    log.warning(key + " institution set to " + value["institution"])
 
-            if not value["institution"]:
-                value["institution"] = key.split("@")[1].split('_')[0]
-                log.warning(key + " institution set to " + value["institution"])
-
-
-            if not value["faculty"] and len(key.split("@")[1].split('_'))>1:
-                value["faculty"] = key.split("@")[1].split('_')[1]
-                log.warning(key + " faculty set to " + value["faculty"])
+                if not value["faculty"] len(key.split("@")[1].split('_'))>1:
+                    value["faculty"] = key.split("@")[1].split('_')[1]
+                    log.warning(key + " faculty set to " + value["faculty"])
 
             if not value["file_group"] and value["institution"]:
                 value["file_group"] = value["institution"]+"-org"
