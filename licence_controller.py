@@ -207,7 +207,7 @@ def validate():
                     value["institution"] = key.split("@")[1].split('_')[0]
                     log.warning(key + " institution set to " + value["institution"])
 
-                if not value["faculty"] len(key.split("@")[1].split('_'))>1:
+                if not value["faculty"] and len(key.split("@")[1].split('_'))>1:
                     value["faculty"] = key.split("@")[1].split('_')[1]
                     log.warning(key + " faculty set to " + value["faculty"])
 
