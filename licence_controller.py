@@ -167,8 +167,8 @@ def get_nesi_use():
 def restart():
     """Restarts licence controller"""
     log.info("Restarting licence controller")
-    c.writemake_json("licence_list.json", licence_list)
-    c.writemake_json("meta/licence_meta.json", licence_meta)
+    c.writemake_json(settings["path_store"], licence_list)
+    c.writemake_json(settings["path_meta"], licence_meta)
 
     os.execl(sys.executable, sys.executable, *sys.argv)
 
@@ -334,27 +334,27 @@ def main():
     get_nesi_use()
     apply_soak()
 
-    c.writemake_json("licence_list.json", licence_list)
+    c.writemake_json(settings["path_store"], licence_list)
 
     log.info("main loop time = " + str(time.time() - looptime))
     time.sleep((settings["poll_period"] - (time.time() - looptime)))
 
-log.info("Starting...")
 
-settings = c.readmake_json("licence_collector_settings.json")
+settings = c.readmake_json("settings.json")
+
+log.info("Starting...")
 
 c.dummy_checks()
 
 log.info(json.dumps(settings))
 
-licence_meta = c.readmake_json("meta/licence_meta.json")
-licence_list = c.readmake_json("licence_list.json")
+licence_meta = c.readmake_json(settings["path_meta"])
+licence_list = c.readmake_json(settings["path_store"])
 
 if os.environ.get("VALIDATE")=="NO":
     log.info("Skipping validation")
 else:
     validate()
-
 
 # Is correct user
 if os.environ["USER"] != settings["user"]:

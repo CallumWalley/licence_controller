@@ -3,6 +3,8 @@
     "default_path": "/opt/nesi/${cluster}/${software}/Licenses/${institution}_${faculy}.lic",
     "user": "nesi-apps-admin",
     "point_weight": 0.01,
+    "path_meta":"meta.json",
+    "path_store":"cache/licence_list.json",
     "default": {
         "software_name": "",
         "institution": "",
