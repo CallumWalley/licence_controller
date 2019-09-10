@@ -1,0 +1,70 @@
+{
+    "ansys_t@uoa_foe": {
+        "flex_method": "lmutil",
+        "conditions": "Teaching licence, one per simulation with less than 512k nodes.",
+        "enabled": true,
+        "feature": "aa_t_a",
+        "file_address": "/opt/nesi/mahuika/ANSYS/Licenses/uoa_foe.lic",
+        "file_group": "uoa-org"
+    },
+    "ansys_r@uoa_foe": {
+        "flex_method": "lmutil",
+        "conditions": "Research licence, one per simulation with more than 512k nodes.",
+        "enabled": true,
+        "feature": "aa_r",
+        "file_address": "/opt/nesi/mahuika/ANSYS/Licenses/uoa_foe.lic",
+        "file_group": "uoa-org"
+    },
+    "ansys_hpc@uoa_foe": {
+        "flex_method": "lmutil",
+        "conditions": "One licence for every CPU over 16. (Must also include 1 teaching/research licence).",
+        "enabled": true,
+        "feature": "aa_r_hpc",
+        "file_address": "/opt/nesi/mahuika/ANSYS/Licenses/uoa_foe.lic",
+        "file_group": "uoa-org"
+    },
+    "comsol@uoa_physics": {
+        "conditions": "Licence use by booking only.",
+	"enabled": true,
+	"feature" : "COMSOL",
+        "file_address": "/opt/nesi/mahuika/COMSOL/Licenses/uoa_physics.lic",
+        "file_group": "uoa-org"
+    },
+    "abaqus@uoa_foe": {
+        "flex_method": "lmutil",
+        "enabled": true,
+        "feature": "abaqus",
+        "file_address": "/opt/nesi/mahuika/ABAQUS/Licenses/uoa_foe.lic",
+        "file_group": "uoa-org"
+    },
+    "matlab@uoa": {
+	"flex_method":"lmutil",
+	"enabled" : true,
+	"feature" : "MATLAB",
+	"file_address" : "/opt/nesi/mahuika/MATLAB/Licenses/uoa.lic",
+	"file_group" : "uoa-org"
+    },
+    "matlab@uow": {
+        "flex_method":"lmutil",
+        "enabled" : true,
+        "feature" : "MATLAB",
+	"file_group" : "uow-org",
+        "file_address" : "/opt/nesi/mahuika/MATLAB/Licenses/uow.lic"
+    },
+    "matlab@vuw": {
+        "flex_method":"lmutil",
+        "enabled" : true,
+        "feature" : "MATLAB",
+	"file_group" : "vuw-org",
+        "file_address" : "/opt/nesi/mahuika/MATLAB/Licenses/vuw.lic"
+    },
+    "matlab@aut": {
+        "flex_method":"lmutil",
+        "enabled" : true,
+        "feature" : "MATLAB",
+	"file_group" : "aut-org",
+        "file_address" : "/opt/nesi/mahuika/MATLAB/Licenses/aut.lic"
+    }
+
+}
+
