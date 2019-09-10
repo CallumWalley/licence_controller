@@ -8,10 +8,10 @@
     "default": {
         "software_name": "",
         "institution": "",
-        "institution_alias": "",
+        "server_name": "",
         "faculty": "",
-        "faculty_alias": "",
         "lic_type": "",
+        "lic_name": "",
         "cluster": "",
         "server_type": "",
         "file_address": "",
