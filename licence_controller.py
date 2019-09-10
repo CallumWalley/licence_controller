@@ -98,8 +98,8 @@ def apply_soak():
     
     for key, value in licence_list.items():
         
-        log.info("║" + str(key.split("@")[0].center(13)) + "║" + str(key.split("@")[1].center(13)) + "║" + str(value["total"]).center(13) + "║"  + str(value["in_use_real"]).center(13) + "║" + str(value["in_use_nesi"]).center(13) + "║" + str(value["day_ave"][hour_index]).center(13) + "║" + str(value["soak"]).center(13) + "║")
-
+        try: 
+            log.info("║" + value["lic_name"].center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["total"]).center(13) + "║"  + str(value["in_use_real"]).center(13) + "║" + str(value["in_use_nesi"]).center(13) + "║" + str(value["day_ave"][hour_index]).center(13) + "║" + str(value["soak"]).center(13) + "║")
 
         if value["enabled"]:
             soak_count += key + ":" + str(int(value["soak"])) + ","
@@ -155,7 +155,7 @@ def get_nesi_use():
 
             if scontrol_name in licence_list.keys():
                 if licence_list[scontrol_name]["total"] != int(scontrol_total):
-                    log.error("THIS SHOULD NEVER HAPPEN")
+                    log.error("Scontrol total incorrectly set!!S")
                 else:
                     licence_list[scontrol_name]["in_use_nesi"] = int(scontrol_used)
             else:
@@ -217,6 +217,20 @@ def validate():
             
             if not value["day_ave"] or not len(value["day_ave"]) == 24:
                 value["day_ave"] = [0] * 24
+                log.warning(key + " file_group set.")
+
+            if not value["server_name"]:
+                value["server_name"]=value["institution"]
+                if value["faculty"]
+                    value["server_name"] += "_" + value["faculty"]
+                log.warning(key + " file_group set to " + value["server_name"])
+
+            if not value["lic_name"]:
+                value["lic_name"]=value["software_name"].lower()
+                if value["lic_type"]
+                    value["lic_name"] += "_" + value["lic_type"]
+                log.warning(key + " file_group set to " + value["lic_name"])
+
 
     def _address(licence_list, licence_meta):
         for key, value in licence_list.items():
