@@ -198,7 +198,7 @@ def validate():
                 value["software_name"] = key.split("@")[0].split('_')[0]        
                 log.warning(key + " software_name set to " + value["software_name"])
 
-            if not value["feature"] and len(key.split("@")[0].split('_')[1])>1:
+            if not value["feature"] and len(key.split("@")[0].split('_')>1:
                 value["feature"] = key.split("@")[0].split('_')[1]
                 log.warning(key + " feature set to " + value["feature"])
 
