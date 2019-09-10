@@ -98,8 +98,7 @@ def apply_soak():
     
     for key, value in licence_list.items():
         
-        try: 
-            log.info("║" + value["lic_name"].center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["total"]).center(13) + "║"  + str(value["in_use_real"]).center(13) + "║" + str(value["in_use_nesi"]).center(13) + "║" + str(value["day_ave"][hour_index]).center(13) + "║" + str(value["soak"]).center(13) + "║")
+        log.info("║" + value["lic_name"].center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["total"]).center(13) + "║"  + str(value["in_use_real"]).center(13) + "║" + str(value["in_use_nesi"]).center(13) + "║" + str(value["day_ave"][hour_index]).center(13) + "║" + str(value["soak"]).center(13) + "║")
 
         if value["enabled"]:
             soak_count += key + ":" + str(int(value["soak"])) + ","
@@ -221,13 +220,13 @@ def validate():
 
             if not value["server_name"]:
                 value["server_name"]=value["institution"]
-                if value["faculty"]
+                if value["faculty"]:
                     value["server_name"] += "_" + value["faculty"]
                 log.warning(key + " file_group set to " + value["server_name"])
 
             if not value["lic_name"]:
                 value["lic_name"]=value["software_name"].lower()
-                if value["lic_type"]
+                if value["lic_type"]:
                     value["lic_name"] += "_" + value["lic_type"]
                 log.warning(key + " file_group set to " + value["lic_name"])
 
