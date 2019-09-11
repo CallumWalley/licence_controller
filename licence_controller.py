@@ -270,7 +270,7 @@ def validate():
             log.debug(sub_input)
             string_data=subprocess.check_output(sub_input, shell=True).decode("utf-8").strip()
         except Exception as details:
-            log.error("Failed to check SLURM tokens. " + str(details))
+            log.error("Failed to check SLURM tokens. " + str(details))       
         else:
             active_token_dict = {}
             # Format output data into dictionary 
@@ -282,35 +282,31 @@ def validate():
 
 
             for key, value in licence_list.items():
-
-                name = value["software_name"] + "_" + value["lic_type"] if value["lic_type"] else value["software_name"]
-                server = value["institution"] + "_" + value["faculty"] if value["faculty"] else value["institution"]
-
                 if key not in active_token_dict.keys():
-                    log.error("'" + key + "' does not have a token in slurm database!")
+                    log.error("'" + key + "' does not have a token in SACCT database!")
+                    # User does not have perms to add
+                    # # if possible, create.
+                    # if value["institution"] and value["total"] and value["software_name"]:           
+                    #     log.error("Attempting to add...")
 
-                    # if possible, create.
-                    if value["institution"] and value["total"] and value["software_name"]:           
-                        log.error("Attempting to add...")
-
-                        try:
-                            sub_input="sacctmgr -i add resource Name=" + name.lower() + " Server=" + server.lower() + " Count=" + str(int(value["total"]*2)) + " Type=License percentallowed=50 where cluster=mahuika"
-                            log.debug(sub_input)
-                            subprocess.check_output(sub_input, shell=True).decode("utf-8")
+                    #     try:
+                    #         sub_input="sacctmgr -i add resource Name=" + value["lic_name"] + " Server=" + value["server_name"] + " Count=" + str(int(value["total"]*2)) + " Type=License percentallowed=50 where cluster=mahuika"
+                    #         log.debug(sub_input)
+                    #         subprocess.check_output(sub_input, shell=True).decode("utf-8")
                             
-                        except Exception as details:
-                            log.error(details)
-                        else:
-                            log.info("Token added successfully!")
+                    #     except Exception as details:
+                    #         log.error(details)
+                    #     else:
+                    #         log.info("Token added successfully!")
                     
-                    else:
-                        log.error("Must have 'instituiton, software_name, cluster, total' set in order to generate SLURM token.")
+                    # else:
+                    #     log.error("Must have 'instituiton, software_name, cluster, total' set in order to generate SLURM token.")
 
                 else:
                     if value["total"] != int(active_token_dict[key][3])/2:
                         log.error("SLURM TOKEN BAD, HAS " + str(int(active_token_dict[key][3])/2)  + " and should be " + str(value["total"]))
                         try:
-                            sub_input="sacctmgr -i modify resource Name=" + name.lower() + " Server=" + server.lower() + " set Count=" + str(int(value["total"]*2))
+                            sub_input="sacctmgr -i modify resource Name=" + value["lic_name"].lower() + " Server=" + value["server_name"].lower() + " set Count=" + str(int(value["total"]*2))
                             log.debug(sub_input)
                             subprocess.check_output(sub_input, shell=True)        
                         except Exception as details:
@@ -321,11 +317,11 @@ def validate():
                         log.error("SLURM token not cluster-split")
 
                         try:
-                            sub_input="sacctmgr -i modify resource Name=" + name.lower() + " Server=" + server.lower() + "percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
+                            sub_input="sacctmgr -i modify resource Name=" + value["lic_name"].lower() + " Server=" + value["server_name"] + "percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
                             log.debug(sub_input)
                             subprocess.check_output(sub_input, shell=True)
 
-                            sub_input="sacctmgr -i modify resource Name=" + name.lower() + " Server=" + server.lower() + "percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
+                            sub_input="sacctmgr -i modify resource Name=" + value["lic_name"].lower() + " Server=" + value["server_name"] + "percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
                             log.debug(sub_input)
                             subprocess.check_output(sub_input, shell=True)
                         except Exception as details:
@@ -355,9 +351,6 @@ def main():
 settings = c.readmake_json("settings.json")
 
 log.info("Starting...")
-
-c.dummy_checks()
-
 log.info(json.dumps(settings))
 
 licence_meta = c.readmake_json(settings["path_meta"])
