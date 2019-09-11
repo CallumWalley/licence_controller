@@ -98,7 +98,7 @@ def apply_soak():
     
     for key, value in licence_list.items():
         
-        log.info("║" + value["lic_name"].center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["total"]).center(13) + "║"  + str(value["in_use_real"]).center(13) + "║" + str(value["in_use_nesi"]).center(13) + "║" + str(value["day_ave"][hour_index]).center(13) + "║" + str(value["soak"]).center(13) + "║")
+        log.info("║" + value["lic_name"].center(13) + "║" + value["server_name"].center(13) + "║" + str(value["total"]).center(13) + "║"  + str(value["in_use_real"]).center(13) + "║" + str(value["in_use_nesi"]).center(13) + "║" + str(value["day_ave"][hour_index]).center(13) + "║" + str(value["soak"]).center(13) + "║")
 
         if value["enabled"]:
             soak_count += key + ":" + str(int(value["soak"])) + ","
