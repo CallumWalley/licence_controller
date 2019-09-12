@@ -68,7 +68,7 @@ def lmutil():
 
                     # Find modified in use value
                     interesting = max(value["history"])-value["in_use_nesi"]
-                    value["in_use_modified"] = round(min(
+                    value["soak"] = round(value["total"]-min(
                         max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"])), value["total"], 0
                     ))
 
@@ -154,7 +154,7 @@ def get_nesi_use():
 
             if scontrol_name in licence_list.keys():
                 if licence_list[scontrol_name]["total"] != int(scontrol_total):
-                    log.error("Scontrol total incorrectly set!!S")
+                    log.error(scontrol_name + " SCONTROL total incorrectly set!!")
                 else:
                     licence_list[scontrol_name]["in_use_nesi"] = int(scontrol_used)
             else:
