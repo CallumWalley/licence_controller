@@ -68,7 +68,7 @@ def lmutil():
 
                     # Find modified in use value
                     interesting = max(value["history"])-value["in_use_nesi"]
-                    value["soak"] = round(value["total"]-min(
+                    value["soak"] = round(min(
                         max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"])), value["total"], 0
                     ))
 
