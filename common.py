@@ -4,6 +4,8 @@ import requests
 import logging
 import datetime
 import subprocess
+import requests
+
 
 def init_logger(path):
     
@@ -27,6 +29,23 @@ def init_logger(path):
 
     return log
 
+def post_kafka(topic, outject):
+    
+
+    headers = {
+        'Content-Type': 'application/vnd.kafka.json.v2+json',
+        'Accept': 'application/vnd.kafka.v2+json',
+    }
+    data = json.dumps({"records":[{"value":outject}]})
+    response = requests.post('https://hpcwprojects05.dev.mahuika.nesi.org.nz:10002/topics/' + topic, headers=headers, data=data, verify=False)
+ 
+    if response.status_code == 200: 
+        log.info("POST to Kafka successful!") 
+        return 0
+    else:
+        log.error("POST to Kafka failed: " +  str(response.content))
+        return 1
+        
 def pull(address):
     request = requests.get(address)
     if request.status_code == 200:
@@ -36,11 +55,10 @@ def pull(address):
         except:
             log.error("Failed to convert request from " + address +
                       " to dictionary.")
-            print(request.content)
+            log.debug(str(request.content))
     else:
-        log.error("Failed to pull from " + address + " (" +
-                  request.status_code + ").")
-    return 1
+        log.error("Failed to pull from " + str(address))# + " (" + str(request.status_code) + ").")
+    return
 #Read file at {path}. If not exist make one with {default} value
 
 def readmake_json(path, default={}):
