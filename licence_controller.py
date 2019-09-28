@@ -291,7 +291,7 @@ def validate():
 
                     # Read lic file contents
                     try:
-                        sub_input="head -n 1 " + value["licence_file_path"]
+                        sub_input="/bin/head -n 1 " + value["licence_file_path"]
                         log.debug(sub_input)
                         sub_out=subprocess.check_output(sub_input).decode("utf-8")
                     except Exception as details:
