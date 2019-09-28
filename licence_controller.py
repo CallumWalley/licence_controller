@@ -47,6 +47,7 @@ def lmutil():
         features=list()
         lmutil_return=""
 
+
         try:
             shell_string="linx64/lmutil " + "lmstat " + " -c " + value["licence_file_path"]
             log.debug(shell_string)
@@ -54,7 +55,7 @@ def lmutil():
         except Exception as details:
             log.error("Failed to fetch " + key + " " + str(details))
             log.info("Fully soaking " + key)
-            value["token_soak"] = value["real_total"]
+            #value["token_soak"] = value["real_total"]
         else:
             for line in (lmutil_return.split("\n")):  
                 feature_match = re.match(feature_pattern, line)
@@ -419,7 +420,7 @@ def main():
     looptime = time.time()
 
     lmutil()
-    
+
     get_nesi_use()
 
     if os.environ["SOAK"].lower() != "false":
