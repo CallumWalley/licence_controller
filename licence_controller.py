@@ -293,12 +293,12 @@ def validate():
                     try:
                         sub_input="head -n 1 " + value["licence_file_path"]
                         log.debug(sub_input)
-                        sub_out=subprocess.check_output(sub_input).decode("utf-8")                         
+                        sub_out=subprocess.check_output(sub_input).decode("utf-8")
                     except Exception as details:
-                        log.error("Failed to check licence file contents: " + str(details))
+                        log.error("Failed to check " + key + " licence file contents at " + value["licence_file_path"] + ": " + str(details))
                     else:
                         if len(sub_out)<4:
-                            log.error("Licence File is missing details.")
+                            log.error(key + "Licence File is missing details.")
                         else:
                             if value["server_address"] and value["server_address"]!=sub_out[1]:
                                 log.error(key + " server_address does not match recorded one.")
@@ -359,7 +359,7 @@ def validate():
                         else:
                             log.error("Token not created. Must have 'instituiton, software_name, cluster, real_total' set.")
                     else:
-                        log.error("User does not have required SLURM permissions to fix SLURM tokens.")
+                        log.error("User does not have required SLURM permissions to add new SLURM tokens.")
 
                 else:
                     # If total on licence server does not match total slurm tokens, update slurm tokens.
@@ -375,7 +375,7 @@ def validate():
                             else:
                                 log.warning("Token modified successfully!")
                         else:
-                            log.error("User does not have required SLURM permissions to fix SLURM tokens.")
+                            log.error("User does not have required SLURM permissions to fix SLURM tokens totals.")
 
                     if active_token_dict[key][7] != "50":
                         log.error("SLURM token not cluster-split")
