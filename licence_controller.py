@@ -292,7 +292,7 @@ def validate():
                     # Read lic file contents
                     try:
                         with open(value["licence_file_path"]) as file:
-                            sub_out = file.readline()
+                            sub_out = file.readline().split()
                     except Exception as details:
                         log.error("Failed to check " + key + " licence file contents at " + value["licence_file_path"] + ": " + str(details))
                     else:
@@ -422,7 +422,7 @@ def main():
 
     get_nesi_use()
 
-    if os.environ.get("SOAK").lower() != "false":
+    if os.environ.get("SOAK","").lower() != "false":
         apply_soak()
 
     c.writemake_json(settings["path_store"], licence_list)
