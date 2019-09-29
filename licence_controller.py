@@ -185,9 +185,9 @@ def get_nesi_use():
             scontrol_used = line.split(' ')[2].split('=')[1]
 
             if scontrol_name in licence_list.keys():
-                if licence_list[scontrol_name]["real_total"] != int(scontrol_total):
-                    log.error(scontrol_name + " SCONTROL total incorrectly set!!")
-                else:
+                if licence_list[scontrol_name]["real_total"] == int(scontrol_total):
+                #     log.error(scontrol_name + " SCONTROL total incorrectly set! ( " + ")")
+                # else:
                     licence_list[scontrol_name]["token_usage"] = int(scontrol_used)
             else:
                 log.error("Licence " + scontrol_name + " does not exist in licence controller.")
@@ -291,9 +291,8 @@ def validate():
 
                     # Read lic file contents
                     try:
-                        sub_input="/bin/head -n 1 " + value["licence_file_path"]
-                        log.debug(sub_input)
-                        sub_out=subprocess.check_output(sub_input).decode("utf-8")
+                        with open(value["licence_file_path"]) as file:
+                            sub_out = file.readline()
                     except Exception as details:
                         log.error("Failed to check " + key + " licence file contents at " + value["licence_file_path"] + ": " + str(details))
                     else:
@@ -423,7 +422,7 @@ def main():
 
     get_nesi_use()
 
-    if os.environ["SOAK"].lower() != "false":
+    if os.environ.get("SOAK").lower() != "false":
         apply_soak()
 
     c.writemake_json(settings["path_store"], licence_list)
