@@ -51,7 +51,7 @@ def lmutil():
 
 
         try:
-            shell_string="linx64/lmutil " + "lmstat " + " -c " + value["licence_file_path"]
+            shell_string="linx64/lmutil " + "lmstat " + "-a -c " + value["licence_file_path"]
             log.debug(shell_string)
             lmutil_return=subprocess.check_output(shell_string, shell=True).strip()    #Removed .decode("utf-8") as threw error.     
         except Exception as details:
