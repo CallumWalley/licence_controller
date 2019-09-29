@@ -39,9 +39,11 @@ def lmutil():
             continue      
 
         if value["server_address"] not in lmutil_list:
-            lmutil_list[value["server_address"]]=[]
-        lmutil_list[value["server_address"]].append(key)
+            lmutil_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "tokens":[]}
+        lmutil_list[value["server_address"]]["tokens"].append(key)
     
+    print(lmutil_list)
+
     for key, value in lmutil_list.items():   
             
         features=list()
