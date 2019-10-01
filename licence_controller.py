@@ -20,16 +20,17 @@ from common import log
 def lmutil():
     """Checks total of available licences for all objects passed"""
 
-    feature_pattern="Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)"
-    licence_pattern="\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*)"
-    cluster_pattern="mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*"
+    feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
+    licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
+    
+    cluster_pattern=r"mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*"
     
     # Some Servers have multiple features being tracked.
     # Consolidate licence servers to avoid making multiple calls.
     
     lmutil_list={}
     for key, value in licence_list.items():
-        if not value["enabled"]:
+        if not value["active"]:
             continue
         if not value["licence_file_path"]:
             log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL")
@@ -42,14 +43,9 @@ def lmutil():
             lmutil_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "tokens":[]}
         lmutil_list[value["server_address"]]["tokens"].append(key)
     
-    print(lmutil_list)
-
-    for key, value in lmutil_list.items():   
-            
-        features=list()
+    for key, value in lmutil_list.items():              
+        
         lmutil_return=""
-
-
         try:
             shell_string="linx64/lmutil " + "lmstat " + "-a -c " + value["licence_file_path"]
             log.debug(shell_string)
@@ -59,84 +55,62 @@ def lmutil():
             log.info("Fully soaking " + key)
             #value["token_soak"] = value["real_total"]
         else:
+            # Create object from output.
+            features={}
             for line in (lmutil_return.split("\n")):  
-                feature_match = re.match(feature_pattern, line)
-                licence_match = re.match(licence_pattern, line)
-               
+                feature_match = feature_pattern.match(line)
+                licence_match = licence_pattern.match(line)
+
                 if feature_match:
-                    current_feature={"total":feature_match.groupdict()["total"], "in_use_real":feature_match.groupdict()["in_use_real"], "in_use_nesi_real":0, "users":[],"users_nesi":[]}
-                    features.append({feature_match.groupdict()["feature_name"]:current_feature})
+                    current_feature={"real_total":int(feature_match.groupdict()["total"]), "real_usage_all":int(feature_match.groupdict()["in_use_real"]), "real_usage_nesi":0, "users":[],"users_nesi":[]}
+                    features[feature_match.groupdict()["feature_name"]]=current_feature
             
                 if licence_match:
                     licence_row_object=licence_match.groupdict()
-                    current_feature["users"].append(licence_row_object)
-                    
+                    #current_feature["users"].append(licence_row_object)
+
                     if re.match(cluster_pattern, licence_row_object["socket"]):
                         current_feature["users_nesi"].append(licence_row_object)
-                        current_feature["in_use_nesi_real"]+=1
-            
-            print(features)         
-            # found=False                
+                        if licence_row_object["count"]:
+                            current_feature["real_usage_nesi"]+=int(licence_row_object["count"])
+                        else:
+                            current_feature["real_usage_nesi"]+=1
+            for token in value["tokens"]:
+                licence_list[token].update(features[licence_list[token]["licence_feature_name"]])
+                
+def do_maths():              
 
-            # for feature in features:
-            #     if feature["feature_name"] == value["feature"]:
-            #         found=True
-            #         hour_index = dt.datetime.now().hour - 1
-            #         value["in_use_real"] = int(feature["in_use_real"])
+    for key, value in licence_list.items():
+        hour_index = dt.datetime.now().hour - 1
 
-            #         if value["total"] != int(feature["total"]):
-            #             log.warning("LMUTIL shows different total number of licences than recorded. Changing from '" + str(value["total"]) + "' to '" + feature["total"] + "'")
-            #             value["total"] = int(feature["total"])
+        # Record to running history
+        value["history"].append(value["real_usage_all"])
 
-            #         # Record to running history
-            #         value["history"].append(value["in_use_real"])
+        # Pop extra array entries
+        while len(value["history"]) > value["history_points"]:
+            value["history"].pop(0)
 
-            #         # Pop extra array entries
-            #         while len(value["history"]) > value["history_points"]:
-            #             value["history"].pop(0)
+        # Find modified in use value
+        interesting = max(value["history"])-value["token_usage"]
+        value["token_soak"] = int(min(
+            max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
+        ))
 
-            #         # Find modified in use value
-            #         interesting = max(value["history"])-value["in_use_nesi"]
-            #         value["soak"] = round(min(
-            #             max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["total"]
-            #         ))
-
-            #         # Update average
-            #         value["day_ave"][hour_index] = (
-            #             round(
-            #                 ((value["in_use_real"] * settings["point_weight"]) + (value["day_ave"][hour_index] * (1 - settings["point_weight"]))),
-            #                 2,
-            #             )
-            #             if value["day_ave"][hour_index]
-            #             else value["in_use_real"]
-            #         )
-            #     else:
-            #         log.info("Untracked Feature " + feature["feature_name"] + ": " + (feature["in_use_real"]) +" of " + (feature["total"]) + "in use.")
-
-            # if not found:
-            #     log.error("Feature '" + value["feature"] + "' not found on server for '" + key + "'")
+        # Update average
+        value["hourly_averages"][hour_index] = (
+            round(
+                ((value["real_usage_all"] * settings["point_weight"]) + (value["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
+                2,
+            )
+            if value["hourly_averages"][hour_index]
+            else value["real_usage_all"]
+        )
 
 def apply_soak():
-
-    hour_index = dt.datetime.now().hour - 1
-
-    soak_count = ""
-    log.info("╔═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╗")
-    log.info("║   Licence   ║    Server   ║    Total    ║ In Use All  ║ In Use NeSI ║ Average Use ║     Soak    ║")
-    log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-    
-    for key, value in licence_list.items():
-        
-        log.info("║" + str(value["licence_name"]).center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["real_total"]).center(13) + "║"  + str(value["real_usage_all"]).center(13) + "║" + str(value["token_usage"]).center(13) + "║" + str(value["hourly_averages"][hour_index]).center(13) + "║" + str(value["token_soak"]).center(13) + "║")
-
-        if value["enabled"]:
-            soak_count += key + ":" + str(int(value["token_soak"])) + ","
-        # Does nothing atm, idea is be able to set max total in use on cluster.
-        # value.max_use
-    log.info("╚═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╝")
-
     cluster = "mahuika"
     res_name = "licence_soak"
+    soak_count = ""
+
     # starts in 1 minute, ends in 1 year
     if slurm_permissions=="operator" or  slurm_permissions=="administrator":
         try:
@@ -168,6 +142,20 @@ def apply_soak():
                 log.error("User does not have required SLURM permissions to create reservations.")
     else:
         log.error("User does not have required permissions to update reservations.")
+
+def print_panel():
+    hour_index = dt.datetime.now().hour - 1
+
+    log.info("╔═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╗")
+    log.info("║   Licence   ║    Server   ║    Status   ║    Total    ║ In Use All  ║ Average Use ║ In Use NeSI ║  Token Use  ║     Soak    ║")
+    log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+    
+    for key, value in licence_list.items():
+        if value["active"]:
+            log.info("║" + str(value["licence_name"]).center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["server_status"]).center(13) + "║" + str(value["real_total"]).center(13) + "║"  + str(value["real_usage_all"]).center(13) + "║"  + str(value["hourly_averages"][hour_index]).center(13) + "║" + str(value["real_usage_nesi"]).center(13) + "║" + str(value["token_usage"]).center(13) + "║" + str(value["token_soak"]).center(13) + "║" )
+
+        
+    log.info("╚═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╝")
 
 def get_nesi_use():
     try:
@@ -215,9 +203,12 @@ def validate():
             licence_list[licence] = {}
     # Adds properties if missing from cachce (for some reason)
     for licence in licence_list.values():
+        # Add missing values
         for key in settings["default"].keys():
             if key not in licence:
                 licence[key] = settings["default"][key]
+        # Remove extra
+
 
     def _fill(licence_list):
         """Guess at any missing properties"""
@@ -382,11 +373,11 @@ def validate():
                         log.error("SLURM token not cluster-split")
                         if slurm_permissions=="operator" or slurm_permissions=="administrator":
                             try:
-                                sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + "percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
+                                sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + " percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
                                 log.debug(sub_input)
                                 subprocess.check_output(sub_input, shell=True)
 
-                                sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + "percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
+                                sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + " percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
                                 log.debug(sub_input)
                                 subprocess.check_output(sub_input, shell=True)
                             except Exception as details:
@@ -424,9 +415,13 @@ def main():
 
     get_nesi_use()
 
+    do_maths()
+    
     if os.environ.get("SOAK","").lower() != "false":
         apply_soak()
 
+    print_panel()
+    print(json.dumps(licence_list))
     c.writemake_json(settings["path_store"], licence_list)
 
     log.info("main loop time = " + str(time.time() - looptime))
@@ -453,3 +448,36 @@ if os.environ["USER"] != settings["user"] and not os.environ.get("CHECKSUSER",""
     exit()
 while 1:
     main()
+
+
+
+    # for key, value in licence_list.items():
+    # hour_index = dt.datetime.now().hour - 1
+    # value["in_use_real"] = int(feature["in_use_real"])
+
+    # if value["total"] != int(feature["total"]):
+    #     log.warning("LMUTIL shows different total number of licences than recorded. Changing from '" + str(value["total"]) + "' to '" + feature["total"] + "'")
+    #     value["total"] = int(feature["total"])
+
+    # # Record to running history
+    # value["history"].append(value["in_use_real"])
+
+    # # Pop extra array entries
+    # while len(value["history"]) > value["history_points"]:
+    #     value["history"].pop(0)
+
+    # # Find modified in use value
+    # interesting = max(value["history"])-value["in_use_nesi"]
+    # value["soak"] = round(min(
+    #     max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["total"]
+    # ))
+
+    # # Update average
+    # value["day_ave"][hour_index] = (
+    #     round(
+    #         ((value["in_use_real"] * settings["point_weight"]) + (value["day_ave"][hour_index] * (1 - settings["point_weight"]))),
+    #         2,
+    #     )
+    #     if value["day_ave"][hour_index]
+    #     else value["in_use_real"]
+    # )
