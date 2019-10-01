@@ -37,7 +37,7 @@ def lmutil():
             continue            
         if not value["licence_feature_name"]: 
             log.error(key + " must have feature specified in order to check with LMUTIL")
-            continue      
+            continue
 
         if value["server_address"] not in lmutil_list:
             lmutil_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "tokens":[]}
@@ -355,19 +355,19 @@ def validate():
 
                 else:
                     # If total on licence server does not match total slurm tokens, update slurm tokens.
-                    if value["real_total"] != int(active_token_dict[key][3])/2 and value["real_total"]!=0:
-                        log.error("SLURM TOKEN BAD, HAS " + str(int(active_token_dict[key][3])/2)  + " and should be " + str(value["total"]))
-                        if slurm_permissions=="operator" or slurm_permissions=="administrator":
-                            try:
-                                sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"].lower() + " set Count=" + str(int(value["real_total"]*2))
-                                log.debug(sub_input)
-                                subprocess.check_output(sub_input, shell=True)        
-                            except Exception as details:
-                                log.error(details)
-                            else:
-                                log.warning("Token modified successfully!")
-                        else:
-                            log.error("User does not have required SLURM permissions to fix SLURM tokens totals.")
+                    # if value["real_total"] != int(active_token_dict[key][3])/2 and value["real_total"]!=0:
+                    #     log.error("SLURM TOKEN BAD, HAS " + str(int(active_token_dict[key][3])/2)  + " and should be " + str(value["total"]))
+                    #     if slurm_permissions=="operator" or slurm_permissions=="administrator":
+                    #         try:
+                    #             sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"].lower() + " set Count=" + str(int(value["real_total"]*2))
+                    #             log.debug(sub_input)
+                    #             subprocess.check_output(sub_input, shell=True)        
+                    #         except Exception as details:
+                    #             log.error(details)
+                    #         else:
+                    #             log.warning("Token modified successfully!")
+                    #     else:
+                    #         log.error("User does not have required SLURM permissions to fix SLURM tokens totals.")
 
                     if active_token_dict[key][7] != "50":
                         log.error("SLURM token not cluster-split")
