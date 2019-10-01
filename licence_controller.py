@@ -421,7 +421,7 @@ def main():
         apply_soak()
 
     print_panel()
-    print(json.dumps(licence_list))
+    #print(json.dumps(licence_list))
     c.writemake_json(settings["path_store"], licence_list)
 
     log.info("main loop time = " + str(time.time() - looptime))
