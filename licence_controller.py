@@ -134,13 +134,13 @@ def apply_soak():
             continue
         if not value["active"]:
             continue
-        soak_count += key + ":" + str(value["token_soak"]) + ", "
+        soak_count += key + ":" + str(value["token_soak"]) + ","
 
     endtime=(dt.datetime.now() + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
 
     # starts in 1 minute, ends in 1 year
     if slurm_permissions=="operator" or  slurm_permissions=="administrator":
-        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' EndTime=' + endtime + ' licenses="' + soak_count + '"'
+        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' EndTime=' + endtime + ' licenses=' + soak_count
         log.debug(sub_input)
         try:
             subprocess.check_output(sub_input, shell=True).decode("utf-8")
@@ -167,12 +167,12 @@ def apply_soak():
                 else:
                     log.info("Reservation updated successescsfully!")
             else:
-                log.debug("please run command '" + sub_input + "' as SLURM admin.")
                 log.error("User does not have required SLURM permissions to create reservations.")
+                log.error("please run command '" + sub_input + "' as SLURM admin.")
+
     else:
         log.error("User does not have required permissions to update reservations.")
-        log.debug("please run command '" + sub_input + "' as SLURM operator or admin.")
-
+        log.error("please run command '" + sub_input + "' as SLURM operator or admin.")
 
 def print_panel():
     hour_index = dt.datetime.now().hour - 1
