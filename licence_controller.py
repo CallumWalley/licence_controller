@@ -81,7 +81,7 @@ def lmutil():
                         else:
                             current_feature["real_usage_nesi"]+=1
             for token in value["tokens"]:
-                print(licence_list)
+                #print(licence_list)
                 licence_list[token].update(features[licence_list[token]["licence_feature_name"]])
                 
 def do_maths():              
@@ -124,14 +124,14 @@ def do_maths():
 def apply_soak():
     cluster = "mahuika"
     res_name = "licence_soak"
-    
+    soak_count=""
 
     for key, value in licence_list.items():
         if not value["enabled"]:
             continue
         if not value["active"]:
             continue
-        soak_count += key + ":" + value["token_soak"] + ", "
+        soak_count += key + ":" + str(value["token_soak"]) + ", "
 
     endtime=(dt.datetime.now() + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
 
