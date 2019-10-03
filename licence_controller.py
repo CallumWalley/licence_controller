@@ -47,7 +47,7 @@ def lmutil():
         if value["server_address"] not in lmutil_list:
             lmutil_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "tokens":[]}
         lmutil_list[value["server_address"]]["tokens"].append(key)
-    
+    print(lmutil_list)
     for key, value in lmutil_list.items():              
         
         lmutil_return=""
@@ -81,6 +81,7 @@ def lmutil():
                         else:
                             current_feature["real_usage_nesi"]+=1
             for token in value["tokens"]:
+                print(licence_list)
                 licence_list[token].update(features[licence_list[token]["licence_feature_name"]])
                 
 def do_maths():              
