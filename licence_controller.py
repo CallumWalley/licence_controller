@@ -43,6 +43,9 @@ def lmutil():
         if not value["sever_poll_method"]=="lmutil": 
             #log.error(key + " must have feature specified in order to check with LMUTIL")
             continue
+        if not value["server_address"]: 
+            #log.error(key + " must have feature specified in order to check with LMUTIL")
+            continue
 
         if value["server_address"] not in lmutil_list:
             lmutil_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "tokens":[]}
