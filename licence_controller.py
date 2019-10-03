@@ -32,11 +32,16 @@ def lmutil():
     for key, value in licence_list.items():
         if not value["active"]:
             continue
+        if not value["enabled"]:
+            continue
         if not value["licence_file_path"]:
             log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL")
             continue            
         if not value["licence_feature_name"]: 
             log.error(key + " must have feature specified in order to check with LMUTIL")
+            continue
+        if not value["sever_poll_method"]=="lmutil": 
+            #log.error(key + " must have feature specified in order to check with LMUTIL")
             continue
 
         if value["server_address"] not in lmutil_list:
@@ -83,6 +88,9 @@ def do_maths():
     for key, value in licence_list.items():
         hour_index = dt.datetime.now().hour - 1
 
+        if not value['enabled']:
+            continue
+
         # Record to running history
         value["history"].append(value["real_usage_all"])
 
@@ -92,9 +100,15 @@ def do_maths():
 
         # Find modified in use value
         interesting = max(value["history"])-value["token_usage"]
-        value["token_soak"] = int(min(
-            max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
-        ))
+
+        if not value['active']:
+            value["token_soak"]=value["real_total"]
+        else:
+            value["token_soak"] = int(min(
+                max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
+            ))
+
+
 
         # Update average
         value["hourly_averages"][hour_index] = (
@@ -109,28 +123,38 @@ def do_maths():
 def apply_soak():
     cluster = "mahuika"
     res_name = "licence_soak"
-    soak_count = ""
+    
+
+    for key, value in licence_list.items():
+        if not value["enabled"]:
+            continue
+        if not value["active"]:
+            continue
+        soak_count += key + ":" + value["token_soak"] + ", "
+
+    endtime=(dt.datetime.now() + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
 
     # starts in 1 minute, ends in 1 year
     if slurm_permissions=="operator" or  slurm_permissions=="administrator":
+        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' EndTime=' + endtime + ' licenses="' + soak_count + '"'
+        log.debug(sub_input)
         try:
-            sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' licenses="' + soak_count + '"'
-            log.debug(sub_input)
             subprocess.check_output(sub_input, shell=True).decode("utf-8")
         except:
             log.error("Failed to update 'licence_soak' attempting to create new reservation.")
+            default_reservation = {
+                "StartTime": (dt.datetime.now() + dt.timedelta(seconds=10)).strftime(("%Y-%m-%dT%H:%M:%S")),
+                "EndTime": endtime,
+                "Users": "root",
+                "Flags": "LICENSE_ONLY",
+            }
+            default_reservation_string = ""
+            for key, value in default_reservation.items():
+                default_reservation_string += " " + key + "=" + str(value)
+            sub_input = "scontrol create ReservationName=" + res_name + default_reservation_string + ' licenses="' + soak_count + '"'
             if slurm_permissions=="administrator":
                 try:
-                    default_reservation = {
-                        "StartTime": (dt.datetime.now() + dt.timedelta(seconds=10)).strftime(("%Y-%m-%dT%H:%M:%S")),
-                        "EndTime": (dt.datetime.now() + dt.timedelta(days=365)).strftime(("%Y-%m-%dT%H:%M:%S")),
-                        "Users": "root",
-                        "Flags": "LICENSE_ONLY",
-                    }
-                    default_reservation_string = ""
-                    for key, value in default_reservation.items():
-                        default_reservation_string += " " + key + "=" + str(value)
-                    sub_input = "scontrol create ReservationName=" + res_name + default_reservation_string + ' licenses="' + soak_count + '"'
+
                     log.debug(sub_input)
                     subprocess.check_output(sub_input, shell=True).decode("utf-8")
                     log.info("New reservation created successescsfully!")
@@ -139,9 +163,12 @@ def apply_soak():
                 else:
                     log.info("Reservation updated successescsfully!")
             else:
+                log.debug("please run command '" + sub_input + "' as SLURM admin.")
                 log.error("User does not have required SLURM permissions to create reservations.")
     else:
         log.error("User does not have required permissions to update reservations.")
+        log.debug("please run command '" + sub_input + "' as SLURM operator or admin.")
+
 
 def print_panel():
     hour_index = dt.datetime.now().hour - 1
@@ -207,6 +234,12 @@ def validate():
         for key in settings["default"].keys():
             if key not in licence:
                 licence[key] = settings["default"][key]
+
+        for key in licence.keys():
+            if key not in settings["default"]:
+                log.warning("Removed defunct key '" + key + "' from something" )
+                licence.pop(key)
+
         # Remove extra
 
 
@@ -324,68 +357,79 @@ def validate():
             string_data=subprocess.check_output(sub_input, shell=True).decode("utf-8").strip()
         except Exception as details:
             log.error("Failed to check SLURM tokens. " + str(details))       
-        # else:
-        #     active_token_dict = {}
-        #     # Format output data into dictionary 
-        #     for lic_string in string_data.split("\n"):
+        else:
+            active_token_dict = {}
+            # Format output data into dictionary 
+            for lic_string in string_data.split("\n"):
 
-        #         log.debug(lic_string)
-        #         str_arr=lic_string.split("|")
-        #         active_token_dict[str_arr[0] + "@" + str_arr[1]]=str_arr
+                log.debug(lic_string)
+                str_arr=lic_string.split("|")
+                active_token_dict[str_arr[0] + "@" + str_arr[1]]=str_arr
 
-        #     for key, value in licence_list.items():
-        #         if key not in active_token_dict.keys():
-        #             log.error("'" + key + "' does not have a token in SACCT database!")
-        #             if slurm_permissions=="administrator":
-        #                 # if possible, create.
-        #                 if value["institution"] and value["real_total"] and value["software_name"]:           
-        #                     log.error("Attempting to add...")
-        #                     try:
-        #                         sub_input="sacctmgr -i add resource Name=" + value["licence_name"] + " Server=" + value["server_name"] + " Count=" + str(int(value["real_total"]*2)) + " Type=License percentallowed=50 where cluster=mahuika"
-        #                         log.debug(sub_input)
-        #                         subprocess.check_output(sub_input, shell=True).decode("utf-8")                         
-        #                     except Exception as details:
-        #                         log.error(details)
-        #                     else:
-        #                         log.info("Token added successfully!")         
-        #                 else:
-        #                     log.error("Token not created. Must have 'instituiton, software_name, cluster, real_total' set.")
-        #             else:
-        #                 log.error("User does not have required SLURM permissions to add new SLURM tokens.")
+            for key, value in licence_list.items():
+                if key not in active_token_dict.keys():
+                    log.error(key + " not in slurm db. Disabling.")
+                    value["enabled"]=False
+                    continue
 
-        #         else:
-        #             If total on licence server does not match total slurm tokens, update slurm tokens.
-        #             if value["real_total"] != int(active_token_dict[key][3])/2 and value["real_total"]!=0:
-        #                 log.error("SLURM TOKEN BAD, HAS " + str(int(active_token_dict[key][3])/2)  + " and should be " + str(value["total"]))
-        #                 if slurm_permissions=="operator" or slurm_permissions=="administrator":
-        #                     try:
-        #                         sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"].lower() + " set Count=" + str(int(value["real_total"]*2))
-        #                         log.debug(sub_input)
-        #                         subprocess.check_output(sub_input, shell=True)        
-        #                     except Exception as details:
-        #                         log.error(details)
-        #                     else:
-        #                         log.warning("Token modified successfully!")
-        #                 else:
-        #                     log.error("User does not have required SLURM permissions to fix SLURM tokens totals.")
+                #if value["real_total"] != int(active_token_dict[key][3])/2
 
-        #             if active_token_dict[key][7] != "50":
-        #                 log.error("SLURM token not cluster-split")
-        #                 if slurm_permissions=="operator" or slurm_permissions=="administrator":
-        #                     try:
-        #                         sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + " percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
-        #                         log.debug(sub_input)
-        #                         subprocess.check_output(sub_input, shell=True)
+                if int(active_token_dict[key][3])/2==0:
+                    value["enabled"]=False
+                    log.error(key + " has 0 tokens in slurm db. Disabling.")
+                    continue
+                # if key not in active_token_dict.keys():
+                #     log.error("'" + key + "' does not have a token in SACCT database!")
+                #     if slurm_permissions=="administrator":
+                #         # if possible, create.
+                #         if value["institution"] and value["real_total"] and value["software_name"]:           
+                #             log.error("Attempting to add...")
+                #             try:
+                #                 sub_input="sacctmgr -i add resource Name=" + value["licence_name"] + " Server=" + value["server_name"] + " Count=" + str(int(value["real_total"]*2)) + " Type=License percentallowed=50 where cluster=mahuika"
+                #                 log.debug(sub_input)
+                #                 subprocess.check_output(sub_input, shell=True).decode("utf-8")                         
+                #             except Exception as details:
+                #                 log.error(details)
+                #             else:
+                #                 log.info("Token added successfully!")         
+                #         else:
+                #             log.error("Token not created. Must have 'instituiton, software_name, cluster, real_total' set.")
+                #     else:
+                #         log.error("User does not have required SLURM permissions to add new SLURM tokens.")
 
-        #                         sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + " percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
-        #                         log.debug(sub_input)
-        #                         subprocess.check_output(sub_input, shell=True)
-        #                     except Exception as details:
-        #                         log.error(details)
-        #                     else:
-        #                         log.info("Token modified successfully!")
-        #                 else:
-        #                     log.error("User does not have required SLURM permissions to fix SLURM tokens.")
+                # else:
+                #     If total on licence server does not match total slurm tokens, update slurm tokens.
+                #     if value["real_total"] != int(active_token_dict[key][3])/2 and value["real_total"]!=0:
+                #         log.error("SLURM TOKEN BAD, HAS " + str(int(active_token_dict[key][3])/2)  + " and should be " + str(value["total"]))
+                #         if slurm_permissions=="operator" or slurm_permissions=="administrator":
+                #             try:
+                #                 sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"].lower() + " set Count=" + str(int(value["real_total"]*2))
+                #                 log.debug(sub_input)
+                #                 subprocess.check_output(sub_input, shell=True)        
+                #             except Exception as details:
+                #                 log.error(details)
+                #             else:
+                #                 log.warning("Token modified successfully!")
+                #         else:
+                #             log.error("User does not have required SLURM permissions to fix SLURM tokens totals.")
+
+                #     if active_token_dict[key][7] != "50":
+                #         log.error("SLURM token not cluster-split")
+                #         if slurm_permissions=="operator" or slurm_permissions=="administrator":
+                #             try:
+                #                 sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + " percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
+                #                 log.debug(sub_input)
+                #                 subprocess.check_output(sub_input, shell=True)
+
+                #                 sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + " percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
+                #                 log.debug(sub_input)
+                #                 subprocess.check_output(sub_input, shell=True)
+                #             except Exception as details:
+                #                 log.error(details)
+                #             else:
+                #                 log.info("Token modified successfully!")
+                #         else:
+                #             log.error("User does not have required SLURM permissions to fix SLURM tokens.")
                     
     _fill(licence_list)
     _address(licence_list, licence_meta)
