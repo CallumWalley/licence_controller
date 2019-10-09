@@ -148,20 +148,21 @@ def apply_soak():
     res_name = "licence_soak"
     soak_count=""
 
+
     for key, value in licence_list.items():
-        if not value["enabled"]:
+        if not (value["enabled"] and value["active"] and value["token_soak"]):
             continue
-        if not value["active"]:
-            continue
-        if value["token_soak"]:
-            continue
+
         soak_count += key + ":" + str(value["token_soak"]) + ","
+
+    if soak_count:
+        soak_count=' licenses=' + soak_count
 
     endtime=(dt.datetime.now() + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
 
     # starts in 1 minute, ends in 1 year
     if slurm_permissions=="operator" or  slurm_permissions=="administrator":
-        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' EndTime=' + endtime + ' licenses=' + soak_count
+        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' EndTime=' + endtime + soak_count
         log.debug(sub_input)
         try:
             subprocess.check_output(sub_input, shell=True).decode("utf-8")
