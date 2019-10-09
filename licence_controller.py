@@ -53,9 +53,7 @@ def lmutil():
     cluster_pattern=re.compile(r"mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*")
     
     for key, value in lmutil_list.items():              
-        log.info("Checking Licence Server at '" + key + "'...")
-
-
+        log.debug("Checking Licence Server at '" + key + "'...")
         lmutil_return=""
         try:
             shell_string="linx64/lmutil " + "lmstat " + "-a -c " + value["licence_file_path"]
@@ -141,6 +139,9 @@ def do_maths():
         )
 
 def apply_soak():
+    if os.environ.get("SOAK","").lower() == "false":
+        log.info("Licence Soak skipped due to 'SOAK=FALSE'")
+        return
 
     log.info("Applying soak...")
 
@@ -489,23 +490,19 @@ def get_slurm_permssions():
 
 def main():
 
-    looptime = time.time()
-
     lmutil()
 
     get_nesi_use()
 
     do_maths()
-    
-    if os.environ.get("SOAK","").lower() != "false":
-        apply_soak()
+     
+    apply_soak()
 
     print_panel()
     #print(json.dumps(licence_list))
     c.writemake_json(settings["path_store"], licence_list)
 
-    log.info("main loop time = " + str(time.time() - looptime))
-    time.sleep((settings["poll_period"] - (time.time() - looptime)))
+    
 
 settings = c.readmake_json("settings.json")
 
@@ -527,9 +524,14 @@ lmutil_list={}
 init_lmutil()
 
 while 1:
-    main()
+    looptime = time.time()
+    try:
+        main()
+    except Exception as details:
+        log.error("Main loop failed: " + details)
 
-
+    log.info("main loop time = " + str(time.time() - looptime))
+    time.sleep(max(settings["poll_period"] - (time.time() - looptime), 0))
 
     # for key, value in licence_list.items():
     # hour_index = dt.datetime.now().hour - 1
