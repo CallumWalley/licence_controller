@@ -16,19 +16,10 @@ from common import log
 # VALIDATE = FALSE # Disables validation check.
 # SOAK = FALSE # Disables soak.
 # LOGLEVEL = ERROR, WARNING, INFO, DEBUG
-
-def lmutil():
-    """Checks total of available licences for all objects passed"""
-
-    feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
-    licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
-    
-    cluster_pattern=r"mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*"
-    
+def init_lmutil():
     # Some Servers have multiple features being tracked.
     # Consolidate licence servers to avoid making multiple calls.
-    
-    lmutil_list={}
+    log.info("Constructing lmutil object...")
     for key, value in licence_list.items():
         if not value["active"]:
             continue
@@ -49,10 +40,21 @@ def lmutil():
 
         if value["server_address"] not in lmutil_list:
             lmutil_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "tokens":[]}
-        lmutil_list[value["server_address"]]["tokens"].append(key)
-    print(lmutil_list)
+        lmutil_list[value["server_address"]]["tokens"].append(value)
+
+def lmutil():
+    """Checks total of available licences for all objects passed"""
+
+    log.info("Checking FlexLM servers...")
+
+    feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
+    licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
+    server_pattern=re.compile(r".*license server (..)\s.*")
+    cluster_pattern=re.compile(r"mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*")
+    
     for key, value in lmutil_list.items():              
-        
+        log.info("Checking Licence Server at '" + key + "'...")
+
         lmutil_return=""
         try:
             shell_string="linx64/lmutil " + "lmstat " + "-a -c " + value["licence_file_path"]
@@ -65,30 +67,37 @@ def lmutil():
         else:
             # Create object from output.
             features={}
+
+            # Rather than for loop, this could be done in 1 call of regex engine.
             for line in (lmutil_return.split("\n")):  
                 feature_match = feature_pattern.match(line)
                 licence_match = licence_pattern.match(line)
+                server_match = server_pattern.match(line)
+
+                if server_match:
+                    server_status=server_match.group(1)
 
                 if feature_match:
-                    current_feature={"real_total":int(feature_match.groupdict()["total"]), "real_usage_all":int(feature_match.groupdict()["in_use_real"]), "real_usage_nesi":0, "users":[],"users_nesi":[]}
+                    current_feature={"server_status":server_status, "real_total":int(feature_match.groupdict()["total"]), "real_usage_all":int(feature_match.groupdict()["in_use_real"]), "real_usage_nesi":0, "users_nesi":[]}
                     features[feature_match.groupdict()["feature_name"]]=current_feature
             
                 if licence_match:
                     licence_row_object=licence_match.groupdict()
                     #current_feature["users"].append(licence_row_object)
 
-                    if re.match(cluster_pattern, licence_row_object["socket"]):
+                    if cluster_pattern.match(licence_row_object["socket"]):
                         current_feature["users_nesi"].append(licence_row_object)
                         if licence_row_object["count"]:
                             current_feature["real_usage_nesi"]+=int(licence_row_object["count"])
                         else:
                             current_feature["real_usage_nesi"]+=1
+            # Assign any tracked features
             for token in value["tokens"]:
-                #print(licence_list)
-                licence_list[token].update(features[licence_list[token]["licence_feature_name"]])
+                token.update(features[token["licence_feature_name"]])
                 
-def do_maths():              
-
+def do_maths():    
+    
+    log.info("Doing maths...")
     for key, value in licence_list.items():
         hour_index = dt.datetime.now().hour - 1
 
@@ -125,6 +134,9 @@ def do_maths():
         )
 
 def apply_soak():
+
+    log.info("Applying soak...")
+
     cluster = "mahuika"
     res_name = "licence_soak"
     soak_count=""
@@ -189,6 +201,8 @@ def print_panel():
     log.info("╚═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╝")
 
 def get_nesi_use():
+    log.info("Checking NeSI tokens...")
+
     try:
         cluster="mahuika"
         sub_input = "scontrol -M " + cluster + " -do show licenses"
@@ -218,7 +232,7 @@ def get_nesi_use():
 
 def restart():
     """Restarts licence controller"""
-    log.info("Restarting licence controller")
+    log.info("Restarting licence controller...")
     c.writemake_json(settings["path_store"], licence_list)
     c.writemake_json(settings["path_meta"], licence_meta)
 
@@ -226,6 +240,12 @@ def restart():
 
 def validate():
     """Checks for inconinosistancies"""
+
+    if os.environ.get("VALIDATE","").lower()=="false":
+        log.info("Skipping validation")
+        return
+
+    log.info("Validating licence dictionary...")
 
     # Adds if licence exists in meta but not list
     for licence in licence_meta.keys():
@@ -374,12 +394,15 @@ def validate():
                 if key not in active_token_dict.keys():
                     log.error(key + " not in slurm db. Disabling.")
                     value["enabled"]=False
+                    value["server_status"]="DISABLED"
                     continue
 
                 #if value["real_total"] != int(active_token_dict[key][3])/2
 
                 if int(active_token_dict[key][3])/2==0:
                     value["enabled"]=False
+                    value["server_status"]="DISABLED"
+
                     log.error(key + " has 0 tokens in slurm db. Disabling.")
                     continue
                 # if key not in active_token_dict.keys():
@@ -443,7 +466,6 @@ def validate():
     c.writemake_json(settings["path_store"], licence_list)
 
 def get_slurm_permssions():
-    
     try:
         shell_string="sacctmgr show user ${USER} -Pn"
         log.debug(shell_string)
@@ -478,22 +500,22 @@ def main():
 settings = c.readmake_json("settings.json")
 
 log.info("Starting...")
-log.info(json.dumps(settings))
-
 slurm_permissions=get_slurm_permssions()
+
+# Is correct user
+if os.environ["USER"] != settings["user"] and not os.environ.get("CHECKUSER","").lower()=="false":
+    log.error("Command should be run as '" + settings["user"] + "' as it owns licence files. (export 'CHECKUSER=FALSE' to disable this check)")
+    exit()
+
+log.debug(json.dumps(settings))
 
 licence_meta = c.readmake_json(settings["path_meta"])
 licence_list = c.readmake_json(settings["path_store"])
 
-if os.environ.get("VALIDATE","").lower()=="false":
-    log.info("Skipping validation")
-else:
-    validate()
+validate()
+lmutil_list={}
+init_lmutil()
 
-# Is correct user
-if os.environ["USER"] != settings["user"] and not os.environ.get("CHECKSUSER","").lower()=="false":
-    log.error("COMMAND SHOULD BE RUN AS '" + settings["user"] + "' ELSE LICENCE STATS WONT WORK")
-    exit()
 while 1:
     main()
 
