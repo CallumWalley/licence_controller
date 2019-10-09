@@ -55,6 +55,7 @@ def lmutil():
     for key, value in lmutil_list.items():              
         log.info("Checking Licence Server at '" + key + "'...")
 
+
         lmutil_return=""
         try:
             shell_string="linx64/lmutil " + "lmstat " + "-a -c " + value["licence_file_path"]
@@ -64,6 +65,10 @@ def lmutil():
             log.error("Failed to fetch " + key + " " + str(details))
             log.info("Fully soaking " + key)
             #value["token_soak"] = value["real_total"]
+            for token in value["tokens"]:
+                token["server_status"]="FAIL"
+            log.info("\rLicence Server at '" + key + "' FAIL")
+
         else:
             # Create object from output.
             features={}
@@ -94,7 +99,9 @@ def lmutil():
             # Assign any tracked features
             for token in value["tokens"]:
                 token.update(features[token["licence_feature_name"]])
-                
+            
+            log.info("Licence Server at '" + key + "' " + server_status)
+ 
 def do_maths():    
     
     log.info("Doing maths...")
@@ -145,6 +152,8 @@ def apply_soak():
         if not value["enabled"]:
             continue
         if not value["active"]:
+            continue
+        if value["token_soak"]:
             continue
         soak_count += key + ":" + str(value["token_soak"]) + ","
 
