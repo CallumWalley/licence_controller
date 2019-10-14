@@ -139,63 +139,58 @@ def do_maths():
         )
 
 def apply_soak():
+
+    def _update_res(cluster):
+       
+
+        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' EndTime=' + endtime + " " + soak_count
+        log.debug(sub_input)
+
+        if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
+            raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input+ "'")
+        
+        subprocess.check_output(sub_input, shell=True).decode("utf-8")
+
+    def _create_res(cluster):
+            sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=" + starttime + " EndTime=" + endtime +  " Users=root Flags=LICENSE_ONLY " + soak_count
+
+            if slurm_permissions!="administrator":          
+                raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
+
+            log.debug(sub_input)
+            subprocess.check_output(sub_input, shell=True).decode("utf-8")
+
     if os.environ.get("SOAK","").lower() == "false":
         log.info("Licence Soak skipped due to 'SOAK=FALSE'")
         return
 
     log.info("Applying soak...")
-
-    cluster = "mahuika"
     res_name = "licence_soak"
+    starttime=(dt.datetime.now() + dt.timedelta(seconds=20)).strftime("%Y-%m-%dT%H:%M:%S")
+    endtime=(dt.datetime.now() + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
     soak_count=""
-
 
     for key, value in licence_list.items():
         if not (value["enabled"] and value["active"] and value["token_soak"]):
             continue
-
         soak_count += key + ":" + str(value["token_soak"]) + ","
 
     if soak_count:
         soak_count=' licenses=' + soak_count
-
-    endtime=(dt.datetime.now() + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
-
-    # starts in 1 minute, ends in 1 year
-    if slurm_permissions=="operator" or  slurm_permissions=="administrator":
-        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' EndTime=' + endtime + soak_count
-        log.debug(sub_input)
-        try:
-            subprocess.check_output(sub_input, shell=True).decode("utf-8")
-        except:
-            log.error("Failed to update 'licence_soak' attempting to create new reservation.")
-            default_reservation = {
-                "StartTime": (dt.datetime.now() + dt.timedelta(seconds=10)).strftime(("%Y-%m-%dT%H:%M:%S")),
-                "EndTime": endtime,
-                "Users": "root",
-                "Flags": "LICENSE_ONLY",
-            }
-            default_reservation_string = ""
-            for key, value in default_reservation.items():
-                default_reservation_string += " " + key + "=" + str(value)
-            sub_input = "scontrol create ReservationName=" + res_name + default_reservation_string + ' licenses="' + soak_count + '"'
-            if slurm_permissions=="administrator":
-                try:
-
-                    log.debug(sub_input)
-                    subprocess.check_output(sub_input, shell=True).decode("utf-8")
-                    log.info("New reservation created successescsfully!")
-                except:
-                    log.error("Failed! Everything failed!")
-                else:
-                    log.info("Reservation updated successescsfully!")
-            else:
-                log.error("User does not have required SLURM permissions to create reservations.")
-                log.error("please run command '" + sub_input + "' as SLURM admin.")
+    try:
+        _update_res("mahuika")
+    except Exception as details:
+        log.error("Reservation update failed: " + str(details))
+        log.info("Attempting to create new reservation.")
+        try: 
+            _create_res("mahuika")
+        except Exception as details:
+            log.error("Failed to create reservation: " + str(details))
+        else:
+            log.info("New reservation '" + res_name + "' created successfully.")
 
     else:
-        log.error("User does not have required permissions to update reservations.")
-        log.error("please run command '" + sub_input + "' as SLURM operator or admin.")
+        log.info("Reservation updated successfully!")
 
 def print_panel():
     hour_index = dt.datetime.now().hour - 1
@@ -528,7 +523,7 @@ while 1:
     try:
         main()
     except Exception as details:
-        log.error("Main loop failed: " + details)
+        log.error("Main loop failed: " + str(details))
 
     log.info("main loop time = " + str(time.time() - looptime))
     time.sleep(max(settings["poll_period"] - (time.time() - looptime), 0))
