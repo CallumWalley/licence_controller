@@ -457,9 +457,8 @@ def validate():
         else:
             active_token_dict = {}
 
-            number_clusters=len(settings["clusters"])
-
-            log.info("Tokens being divided between " + str(number_clusters) + " clusters.")
+            
+            #log.info("Tokens being divided between " + str(number_clusters) + " clusters.")
 
             # Format output data into dictionary 
             for lic_string in string_data.split("\n"):
@@ -477,8 +476,11 @@ def validate():
                 # TO IMPLIMENT
                 # Temporary allocations need to be made to correspond to scheduled licence useage on other cluster.
 
+                number_clusters=len(value["clusters"])
+                
                 correct_share=int(100/number_clusters)
                 correct_count=value["real_total"] *  number_clusters
+                log.info("Licence '" + key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(value["clusters"])) + " ).")
 
                 if key not in active_token_dict.keys():
                     log.error(key + " not in SACCT database. Attempting to add.")
@@ -504,7 +506,7 @@ def validate():
                 if correct_share != actual_share:
                     log.error(key + " has cluster share incorrectly set in SACCT database ( '" + str(actual_share) +  "' should be '" + str(correct_share) + "'). Attempting to fix.")
                     try:
-                        for cluster in settings["clusters"]:
+                        for cluster in value["clusters"]:
                             __update_token_share(cluster)
                     except Exception as details:
                         log.error("Failed to update SLURM token: " + str(details))
@@ -580,8 +582,9 @@ def validate():
         for module, module_value in module_list["modules"].items():
             
             for licence_key, licence_value in licence_list.items():
-                if licence["software_name"].lower() == module.lower():
+                if licence_value["software_name"].lower() == module.lower():
                     log.debug(licence_key +" exists as module")
+                    log.debug(",".join(module_value["machines"]))
                     for cluster in module_value["machines"].keys():
                         if cluster not in licence_value["clusters"]:
                             licence_value["clusters"].append(cluster.lower())
