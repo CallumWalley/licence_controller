@@ -17,7 +17,11 @@ def init_logger(path):
     # Log Info to console USE ENV VARIABLE LOGLEVEL TO OVERRIDE
     console_logs = logging.StreamHandler()
     console_logs.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
-    console_logs.setLevel(os.environ.get("LOGLEVEL", "INFO"))
+    try:
+        console_logs.setLevel(os.environ.get("LOGLEVEL", "INFO"))
+    except Exception as thing:
+        console_logs.setLevel("INFO")
+    
     log.addHandler(console_logs)
 
     # Log warnings and above to text file.
