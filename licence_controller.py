@@ -18,19 +18,22 @@ from common import log
 # licence_pattern=<pattern applied to extract indiviudal licence users>
 # server_pattern=<pattern applied to get global server properties>
 
-
+# Identifies whether NeSI host.
+cluster_pattern=re.compile(r".*mahuika.*|.*maui.*|.*lander.*|.*nesi.*|wbn\d{3}|wcl\d{3}|vgpuwbg\d{3}|wbl\d{3}|wbh\d{3}|nid00\d{3}|wsn\d{3}|vgpuwsg\d{3}", flags=re.I)
 poll_methods={
     "ansysli_util":{
         "shell_command":"export ANSYSLMD_LICENSE_FILE=$(head -n 1 %(licence_file_path)s | sed -n -e 's/.*=//p');linx64/ansysli_util -liusage",
-        "licence_pattern":r"(?P<user>[A-Za-z0-9]*)@(?P<host>\S*)\s*(?P<date>[\d\/]*?) (?P<time>[\d\:]*)\s*(?P<feature>[\S^\d]*)[^\d]*(?P<count>\d*)\s*(?P<misc>.*)", 
+        "licence_pattern":re.compile(r"(?P<user>[A-Za-z0-9]*)@(?P<host>\S*)\s*(?P<date>[\d\/]*?) (?P<time>[\d\:]*)\s*(?P<feature>[\S^\d]*)[^\d]*(?P<count>\d*)\s*(?P<misc>\S*)",flags=re.M), 
         "server_pattern":""
     },
     "lmutil":{
         "shell_command":"linx64/lmutil lmstat -a -c %(licence_file_path)s",
-        "licence_pattern":r"^.*\"(?P<feature>\S+)|\".|\n*^\s*(?P<user>\S*).*\((?P<host>\S*) \d*\).* (?P<date>\d+\/\d+) (?P<time>[\d\:]+).*$",
+        "licence_pattern":re.compile(r"^.*\"(?P<feature>\S+)|\".|\n*^\s*(?P<user>\S*)\s*(?P<host>\S*).*\s(?P<date>\d+\/\d+)\s(?P<time>[\d\:]+).*$",flags=re.M),
         "server_pattern":""
     }
 }
+
+untracked={}
 
 def init_polling_object():
     # Some Servers have multiple features being tracked.
@@ -76,12 +79,14 @@ def poll():
 
     # log.info("Checking FlexLM servers...")
 
-    feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
-    licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
-    server_pattern=re.compile(r".*license server (..)\s.*")
+    # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
+    # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
+    # server_pattern=re.compile(r".*license server (..)\s.*")
 
-    # cluster_pattern=re.compile(r"mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*")
-    for key, value in poll_list.items():              
+    
+
+
+    for key, value in poll_list.items():
         log.debug("Checking Licence Server at '" + key + "'...")
 
         # Should be able to remove this check 
@@ -89,19 +94,79 @@ def poll():
             log.error("Unknown poll method '" + value["server_poll_method"] + "'")
 
         shell_command_string=poll_methods[value["server_poll_method"]]["shell_command"] % value
-        print(shell_command_string)
-
         log.debug(shell_command_string)
+
+        # Clear from last loop
+        for feature_key, feature_value in value["tokens"]:
+            feature_value["real_usage_all"]=0
+            feature_value["real_usage_nesi"]=0
+            feature_value["users_nesi"]={}
         try:
             sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
             #print(sub_return)
             #print(poll_methods[value["server_poll_method"]]["licence_pattern"])
-            features=re.finditer(poll_methods[value["server_poll_method"]]["licence_pattern"], sub_return, flags=re.M)
+            features=poll_methods[value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
             # Create object from output.
             
             # # Rather than for loop, this could be done in 1 call of regex engine.
+            last_lic={}
+            
             for licence in features:
-                print(licence.groupdict())
+                group_dic=licence.groupdict()
+
+                # Continue if partial match
+                if group_dic["user"] == None:
+                    last_lic=group_dic
+                    continue
+
+                # Squash feature header
+                if group_dic["feature"] == None:
+                    if "feature" in last_lic and last_lic["feature"]!=None:
+                        group_dic["feature"]=last_lic["feature"]
+                    else:
+                        last_lic=group_dic
+                        continue
+
+                if group_dic["count"] == None:
+                    group_dic["count"] = 1
+
+                match_cluster=cluster_pattern.match(group_dic["host"])
+
+
+                # If not on nesi, set host to 'remote'
+                if match_cluster is None:
+                    group_dic["host"]="remote"
+                else:
+                    group_dic["host"]=match_cluster[0]
+
+
+                for token in value["tokens"]:
+                    # If tracked feature. Count
+                    if group_dic["feature"].lower() == token["licence_feature_name"].lower():
+                        token["real_usage_all"]+=1
+                        in_use=True
+
+                        if group_dic["host"]!="remote":
+                            token["real_usage_nesi"]+=group_dic["count"]
+
+                            if group_dic["user"] not in token["users_nesi"]:
+                                token["users_nesi"][group_dic["user"]]={"count":0, "sockets":[]}
+
+                            token["users_nesi"][group_dic["user"]]["count"]+=group_dic["count"]
+                            token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"])                       
+
+                if group_dic["host"]=="remote" and in_use:
+                    log.info("Untracked licence '" + group_dic["feature"] +"' in use on '" + group_dic["host"] + "'")
+               
+                last_lic=group_dic
+                        
+
+
+            
+
+                # if 
+                # cluster_pattern
+                
             #     feature_match = feature_pattern.match(line)
             #     licence_match = licence_pattern.match(line)
             #     server_match = server_pattern.match(line)
