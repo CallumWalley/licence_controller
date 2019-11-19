@@ -94,7 +94,7 @@ def poll():
         try:
             sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
             #print(sub_return)
-
+            print(poll_methods[value["server_poll_method"]]["licence_pattern"])
             features=re.finditer(poll_methods[value["server_poll_method"]]["licence_pattern"], sub_return, flags=re.M).groupdict()
             # Create object from output.
             
