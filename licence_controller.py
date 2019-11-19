@@ -134,7 +134,7 @@ def poll():
                 if match_cluster is None:
                     group_dic["host"]="remote"
                 else:
-                    group_dic["host"]=match_cluster[0]
+                    group_dic["host"]=match_cluster(0)
 
                 in_use=False
                 for token in value["tokens"]:
