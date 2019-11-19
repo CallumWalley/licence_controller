@@ -22,12 +22,12 @@ from common import log
 poll_methods={
     "ansysli_util":{
         "shell_command":"export ANSYSLMD_LICENSE_FILE=$(head -n 1 %(licence_file_path)s | sed -n -e 's/.*=//p');linx64/ansysli_util -liusage",
-        "licence_pattern":"(?<user>[A-Za-z0-9]*)@(?<host>\S*)\s*(?<date>[\d\/]*?) (?<time>[\d\:]*)\s*(?<feature>[\S^\d]*)[^\d]*(?<count>\d*)\s*(?<misc>.*)", 
+        "licence_pattern":r"(?P<user>[A-Za-z0-9]*)@(?P<host>\S*)\s*(?P<date>[\d\/]*?) (?P<time>[\d\:]*)\s*(?P<feature>[\S^\d]*)[^\d]*(?P<count>\d*)\s*(?P<misc>.*)", 
         "server_pattern":""
     },
     "lmutil":{
         "shell_command":"linx64/lmutil lmstat -a -c %(licence_file_path)s",
-        "licence_pattern":"^.*\"(?<feature>\S+)|\".|\\n*^\s*(?<user>\S*).*\((?<host>\S*) \d*\).* (?<date>\d+\/\d+) (?<time>[\d\:]+).*$",
+        "licence_pattern":r"^.*\"(?P<feature>\S+)|\".|\n*^\s*(?P<user>\S*).*\((?P<host>\S*) \d*\).* (?P<date>\d+\/\d+) (?P<time>[\d\:]+).*$",
         "server_pattern":""
     }
 }
@@ -76,9 +76,9 @@ def poll():
 
     # log.info("Checking FlexLM servers...")
 
-    # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
-    # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
-    # server_pattern=re.compile(r".*license server (..)\s.*")
+    feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
+    licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
+    server_pattern=re.compile(r".*license server (..)\s.*")
 
     # cluster_pattern=re.compile(r"mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*")
     for key, value in poll_list.items():              
@@ -88,8 +88,9 @@ def poll():
         if value["server_poll_method"] not in poll_methods:
             log.error("Unknown poll method '" + value["server_poll_method"] + "'")
 
-        
         shell_command_string=poll_methods[value["server_poll_method"]]["shell_command"] % value
+        print(shell_command_string)
+
         log.debug(shell_command_string)
         try:
             sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
