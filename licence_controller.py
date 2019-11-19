@@ -47,10 +47,10 @@ def init_polling_object():
     for key, value in licence_list.items():
 
         if not value["active"]:
-            log.error("a")
+            log.debug(key + " is inactive")
             continue
         if not value["enabled"]:
-            log.error("b")
+            log.debug(key + " is disabled")
             continue
         if not value["licence_file_path"]:
             log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL SHOULDNT SEE THIS")
@@ -584,6 +584,10 @@ def validate():
 
                 number_clusters=len(value["clusters"])
                 
+                if number_clusters < 1 :
+                    log.error(key + " not active on any clusters?")
+                    continue
+
                 correct_share=int(100/number_clusters)
                 correct_count=value["real_total"] *  number_clusters
                 log.info("Licence '" + key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(value["clusters"])) + " ).")
@@ -719,7 +723,6 @@ def get_slurm_permssions():
 def main():
 
     poll()
-
     get_nesi_use()
     
     do_maths()
