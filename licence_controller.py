@@ -124,7 +124,7 @@ def poll():
                         last_lic=group_dic
                         continue
 
-                if group_dic["count"] == None:
+                if "count" not in group_dic or group_dic["count"] == None:
                     group_dic["count"] = 1
 
                 match_cluster=cluster_pattern.match(group_dic["host"])
