@@ -92,12 +92,12 @@ def poll():
         shell_command_string=poll_methods[value["server_poll_method"]]["shell_command"] % value
         log.debug(shell_command_string)
         try:
-            lmutil_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
-            print(lmutil_return)
+            sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
+            #print(sub_return)
 
-            features=re.search(value["licence_pattern"],lmutil_return).groupdict()
+            features=re.search(poll_methods[value["server_poll_method"]]["licence_pattern"], sub_return).groupdict()
             # Create object from output.
-            features={}
+            print(features)
 
             # # Rather than for loop, this could be done in 1 call of regex engine.
             for licence in features:
