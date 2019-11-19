@@ -129,32 +129,28 @@ def poll():
 
                 match_cluster=cluster_pattern.match(group_dic["host"])
 
-
                 # If not on nesi, set host to 'remote'
                 if match_cluster is None:
                     group_dic["host"]="remote"
                 else:
-                    print(match_cluster)
-                    print(match_cluster.group)
-                    print(match_cluster.group(0))
                     group_dic["host"]=match_cluster.group(0)
 
                 in_use=False
                 for token in value["tokens"]:
                     # If tracked feature. Count
                     if group_dic["feature"].lower() == token["licence_feature_name"].lower():
-                        token["real_usage_all"]+=1
+                        token["real_usage_all"]+=int(group_dic["count"])
                         in_use=True
 
                         if group_dic["host"]!="remote":
-                            token["real_usage_nesi"]+=group_dic["count"]
+                            token["real_usage_nesi"]+=int(group_dic["count"])
 
                             if group_dic["user"] not in token["users_nesi"]:
                                 token["users_nesi"][group_dic["user"]]={"count":0, "sockets":[]}
 
-                            token["users_nesi"][group_dic["user"]]["count"]+=group_dic["count"]
+                            token["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
                             token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"])                       
-
+                    log.debug(json.dumps(token["users_nesi"]))
                 if group_dic["host"]=="remote" and in_use:
                     log.info("Untracked licence '" + group_dic["feature"] +"' in use on '" + group_dic["host"] + "'")
                
