@@ -90,11 +90,11 @@ def poll():
 
         
         shell_command_string=poll_methods[value["server_poll_method"]]["shell_command"] % value
-        print(shell_command_string)
         log.debug(shell_command_string)
         try:
-            lmutil_return=subprocess.check_output(shell_command_string, shell=True).strip()    #Removed .decode("utf-8") as threw error.     
-            
+            lmutil_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
+            print(lmutil_return)
+
             features=re.search(value["licence_pattern"],lmutil_return).groupdict()
             # Create object from output.
             features={}
