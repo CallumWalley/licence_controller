@@ -46,23 +46,23 @@ def init_polling_object():
 
     for key, value in licence_list.items():
 
-        # if not value["active"]:
-        #     log.error("a")
-        #     continue
-        # if not value["enabled"]:
-        #     log.error("b")
-        #     continue
+        if not value["active"]:
+            log.error("a")
+            continue
+        if not value["enabled"]:
+            log.error("b")
+            continue
         if not value["licence_file_path"]:
-            log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL")
+            log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL SHOULDNT SEE THIS")
             continue            
         if not value["licence_feature_name"]: 
-            log.error(key + " must have feature specified in order to check with LMUTIL")
+            log.error(key + " must have feature specified in order to check with LMUTIL SHOULDNT SEE THIS")
             continue
         if not value["server_poll_method"] in poll_methods.keys(): 
-            log.error(key + " must have poll method specified in order to check with LMUTIL")
+            log.error(key + " must have poll method specified in order to check with LMUTIL SHOULDNT SEE THIS")
             continue
         if not value["server_address"]: 
-            log.error(key + " must have address specified in order to check with LMUTIL")
+            log.error(key + " must have address specified in order to check with LMUTIL SHOULDNT SEE THIS")
             continue
 
         if value["server_address"] not in poll_list:
@@ -152,7 +152,7 @@ def poll():
                             token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"])                       
                     log.debug(json.dumps(token["users_nesi"]))
                 if group_dic["host"]=="remote" and in_use:
-                    log.info("Untracked licence '" + group_dic["feature"] +"' in use on '" + group_dic["host"] + "'")
+                    log.info("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
                
                 last_lic=group_dic
                         
@@ -719,7 +719,7 @@ def get_slurm_permssions():
 def main():
 
     poll()
-    return
+
     get_nesi_use()
     
     do_maths()
