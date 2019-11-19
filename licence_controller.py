@@ -94,7 +94,7 @@ def poll():
         log.debug(shell_command_string)
 
         # Clear from last loop
-        for feature_value in value["tokens"].values:
+        for feature_value in value["tokens"]:
             feature_value["real_usage_all"]=0
             feature_value["real_usage_nesi"]=0
             feature_value["users_nesi"]={}
