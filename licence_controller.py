@@ -136,7 +136,7 @@ def poll():
                 else:
                     group_dic["host"]=match_cluster[0]
 
-
+                in_use=False
                 for token in value["tokens"]:
                     # If tracked feature. Count
                     if group_dic["feature"].lower() == token["licence_feature_name"].lower():
