@@ -95,13 +95,13 @@ def poll():
             sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
             #print(sub_return)
 
-            features=re.search(poll_methods[value["server_poll_method"]]["licence_pattern"], sub_return).groupdict()
+            features=re.finditer(poll_methods[value["server_poll_method"]]["licence_pattern"], sub_return, flags=re.M).groupdict()
             # Create object from output.
-            print(features)
+            
 
             # # Rather than for loop, this could be done in 1 call of regex engine.
             for licence in features:
-                x=1
+                print(licence)
             #     feature_match = feature_pattern.match(line)
             #     licence_match = licence_pattern.match(line)
             #     server_match = server_pattern.match(line)
