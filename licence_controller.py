@@ -77,14 +77,11 @@ def poll():
     """Checks total of available licences for all objects passed"""
         
 
-    # log.info("Checking FlexLM servers...")
+    log.info("Polling...")
 
     # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
     # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
     # server_pattern=re.compile(r".*license server (..)\s.*")
-
-    
-
 
     for key, value in poll_list.items():
         log.debug("Checking Licence Server at '" + key + "'...")
@@ -97,13 +94,13 @@ def poll():
         log.debug(shell_command_string)
 
         # Clear from last loop
-        for feature_key, feature_value in value["tokens"]:
+        for feature_value in value["tokens"].values:
             feature_value["real_usage_all"]=0
             feature_value["real_usage_nesi"]=0
             feature_value["users_nesi"]={}
         try:
             sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
-            #print(sub_return)
+            log.debug(key + " OK")
             #print(poll_methods[value["server_poll_method"]]["licence_pattern"])
             features=poll_methods[value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
             # Create object from output.
@@ -205,7 +202,7 @@ def poll():
 def do_maths():    
     
     log.info("Doing maths...")
-    for key, value in licence_list.items():
+    for value in licence_list.values():
         hour_index = dt.datetime.now().hour - 1
 
         if not value['enabled']:
@@ -298,7 +295,7 @@ def print_panel():
     log.info("║   Licence   ║    Server   ║    Status   ║    Total    ║ In Use All  ║ Average Use ║ In Use NeSI ║  Token Use  ║     Soak    ║")
     log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
     
-    for key, value in licence_list.items():
+    for value in licence_list.values():
         if value["active"]:
             log.info("║" + str(value["licence_name"]).center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["server_status"]).center(13) + "║" + str(value["real_total"]).center(13) + "║"  + str(value["real_usage_all"]).center(13) + "║"  + str(value["hourly_averages"][hour_index]).center(13) + "║" + str(value["real_usage_nesi"]).center(13) + "║" + str(value["token_usage"]).center(13) + "║" + str(value["token_soak"]).center(13) + "║" )
 
