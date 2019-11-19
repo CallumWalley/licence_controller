@@ -14,82 +14,121 @@ from common import log
 # SOAK = FALSE # Disables soak.
 # LOGLEVEL = ERROR, WARNING, INFO, DEBUG
 
-def init_lmutil():
+# cmd_method=<command line argument to get output>
+# licence_pattern=<pattern applied to extract indiviudal licence users>
+# server_pattern=<pattern applied to get global server properties>
+
+
+poll_methods={
+    "ansysli_util":{
+        "shell_command":"export ANSYSLMD_LICENSE_FILE=$(head -n 1 %(licence_file_path)s | sed -n -e 's/.*=//p');linx64/ansysli_util -liusage",
+        "licence_pattern":"(?<user>[A-Za-z0-9]*)@(?<host>\S*)\s*(?<date>[\d\/]*?) (?<time>[\d\:]*)\s*(?<feature>[\S^\d]*)[^\d]*(?<count>\d*)\s*(?<misc>.*)", 
+        "server_pattern":""
+    },
+    "lmutil":{
+        "shell_command":"linx64/lmutil lmstat -a -c %(licence_file_path)s",
+        "licence_pattern":"^.*\"(?<feature>\S+)|\".|\\n*^\s*(?<user>\S*).*\((?<host>\S*) \d*\).* (?<date>\d+\/\d+) (?<time>[\d\:]+).*$",
+        "server_pattern":""
+    }
+}
+
+def init_polling_object():
     # Some Servers have multiple features being tracked.
     # Consolidate licence servers to avoid making multiple calls.
-    log.info("Constructing lmutil object...")
+    
+    log.info("Constructing polling object...")
+    # Just for info
+    server_count=0
+    feature_count=0
+
     for key, value in licence_list.items():
-        if not value["active"]:
-            continue
-        if not value["enabled"]:
-            continue
+
+        # if not value["active"]:
+        #     log.error("a")
+        #     continue
+        # if not value["enabled"]:
+        #     log.error("b")
+        #     continue
         if not value["licence_file_path"]:
             log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL")
             continue            
         if not value["licence_feature_name"]: 
             log.error(key + " must have feature specified in order to check with LMUTIL")
             continue
-        if not value["sever_poll_method"]=="lmutil": 
-            #log.error(key + " must have feature specified in order to check with LMUTIL")
+        if not value["server_poll_method"] in poll_methods.keys(): 
+            log.error(key + " must have poll method specified in order to check with LMUTIL")
             continue
         if not value["server_address"]: 
-            #log.error(key + " must have feature specified in order to check with LMUTIL")
+            log.error(key + " must have address specified in order to check with LMUTIL")
             continue
 
-        if value["server_address"] not in lmutil_list:
-            lmutil_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "tokens":[]}
-        lmutil_list[value["server_address"]]["tokens"].append(value)
+        if value["server_address"] not in poll_list:
+            poll_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "server_poll_method":value["server_poll_method"], "tokens":[]}
+            server_count+=1
+        feature_count+=1
+        poll_list[value["server_address"]]["tokens"].append(value)
+    log.info(str(server_count) + " servers being polled for " + str(feature_count) + " licence features.")
 
-def lmutil():
+
+def poll():
     """Checks total of available licences for all objects passed"""
+        
 
-    log.info("Checking FlexLM servers...")
+    # log.info("Checking FlexLM servers...")
 
-    feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
-    licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
-    server_pattern=re.compile(r".*license server (..)\s.*")
-    cluster_pattern=re.compile(r"mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*")
-    
-    for key, value in lmutil_list.items():              
+    # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
+    # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
+    # server_pattern=re.compile(r".*license server (..)\s.*")
+
+    # cluster_pattern=re.compile(r"mahuika.*|wbn\d{3}|wbl\d{3}|wbh\d{3}|vgpuwbg\d{3}|maui|nid00.*")
+    for key, value in poll_list.items():              
         log.debug("Checking Licence Server at '" + key + "'...")
-        lmutil_return=""
-        try:
-            shell_string="linx64/lmutil " + "lmstat " + "-a -c " + value["licence_file_path"]
-            log.debug(shell_string)
-            lmutil_return=subprocess.check_output(shell_string, shell=True).strip()    #Removed .decode("utf-8") as threw error.     
 
+        # Should be able to remove this check 
+        if value["server_poll_method"] not in poll_methods:
+            log.error("Unknown poll method '" + value["server_poll_method"] + "'")
+
+        
+        shell_command_string=poll_methods[value["server_poll_method"]]["shell_command"] % value
+        print(shell_command_string)
+        log.debug(shell_command_string)
+        try:
+            lmutil_return=subprocess.check_output(shell_command_string, shell=True).strip()    #Removed .decode("utf-8") as threw error.     
+            
+            features=re.search(value["licence_pattern"],lmutil_return).groupdict()
             # Create object from output.
             features={}
 
-            # Rather than for loop, this could be done in 1 call of regex engine.
-            for line in (lmutil_return.split("\n")):  
-                feature_match = feature_pattern.match(line)
-                licence_match = licence_pattern.match(line)
-                server_match = server_pattern.match(line)
+            # # Rather than for loop, this could be done in 1 call of regex engine.
+            for licence in features:
+                x=1
+            #     feature_match = feature_pattern.match(line)
+            #     licence_match = licence_pattern.match(line)
+            #     server_match = server_pattern.match(line)
 
-                if server_match:
-                    server_status=server_match.group(1)
+            #     if server_match:
+            #         server_status=server_match.group(1)
 
-                if feature_match:
-                    current_feature={"server_status":server_status, "real_total":int(feature_match.groupdict()["total"]), "real_usage_all":int(feature_match.groupdict()["in_use_real"]), "real_usage_nesi":0, "users_nesi":[]}
-                    features[feature_match.groupdict()["feature_name"]]=current_feature
+            #     if feature_match:
+            #         current_feature={"server_status":server_status, "real_total":int(feature_match.groupdict()["total"]), "real_usage_all":int(feature_match.groupdict()["in_use_real"]), "real_usage_nesi":0, "users_nesi":[]}
+            #         features[feature_match.groupdict()["feature_name"]]=current_feature
             
-                if licence_match:
-                    licence_row_object=licence_match.groupdict()
+            #     if licence_match:
+            #         licence_row_object=licence_match.groupdict()
 
-                    current_feature["users"].append(licence_row_object)
+            #         current_feature["users"].append(licence_row_object)
 
-                    if cluster_pattern.match(licence_row_object["socket"]):
-                        current_feature["users_nesi"].append(licence_row_object)
-                        if licence_row_object["count"]:
-                            current_feature["real_usage_nesi"]+=int(licence_row_object["count"])
-                        else:
-                            current_feature["real_usage_nesi"]+=1
-                # Assign any tracked features
-                for token in value["tokens"]:
-                    token.update(features[token["licence_feature_name"]])
+            #         if cluster_pattern.match(licence_row_object["socket"]):
+            #             current_feature["users_nesi"].append(licence_row_object)
+            #             if licence_row_object["count"]:
+            #                 current_feature["real_usage_nesi"]+=int(licence_row_object["count"])
+            #             else:
+            #                 current_feature["real_usage_nesi"]+=1
+            #     # Assign any tracked features
+            #     for token in value["tokens"]:
+            #         token.update(features[token["licence_feature_name"]])
                 
-                log.info("Licence Server at '" + key + "' " + server_status)
+            #     log.info("Licence Server at '" + key + "' " + server_status)
         except Exception as details:
             log.error("Failed to fetch " + key + " " + str(details))
             #log.info("Fully soaking " + key)
@@ -97,7 +136,7 @@ def lmutil():
             for token in value["tokens"]:
                 token["server_status"]="FAIL"
             log.info("\rLicence Server at '" + key + "' FAIL")
- 
+
 def do_maths():    
     
     log.info("Doing maths...")
@@ -281,11 +320,13 @@ def validate():
         for key in settings["default"].keys():
             if key not in licence:
                 licence[key] = settings["default"][key]
-
         for key in licence.keys():
             if key not in settings["default"]:
                 log.warning("Removed defunct key '" + key + "' from something" )
                 licence.pop(key)
+        
+        
+
 
         # Remove extra
 
@@ -418,6 +459,8 @@ def validate():
             log.debug(sub_input)
             subprocess.check_output(sub_input, shell=True).decode("utf-8")
 
+            time.sleep(5)
+
         def __update_token_share(cluster):
 
             log.info("Attempting to modify SLURM token " + key + " for " + cluster)
@@ -432,6 +475,7 @@ def validate():
 
             log.debug(sub_input)
             subprocess.check_output(sub_input, shell=True).decode("utf-8")
+            time.sleep(5)
 
         #Try to create  a token if missing.
         def __create_token(cluster):
@@ -447,6 +491,7 @@ def validate():
 
             log.debug(sub_input)
             subprocess.check_output(sub_input, shell=True).decode("utf-8")
+            time.sleep(5)
 
         try:
             sub_input="sacctmgr -pns show resource withcluster"
@@ -612,8 +657,8 @@ def get_slurm_permssions():
 
 def main():
 
-    lmutil()
-    
+    poll()
+    return
     get_nesi_use()
     
     do_maths()
@@ -642,8 +687,8 @@ licence_meta = c.readmake_json(settings["path_meta"])
 licence_list = c.readmake_json(settings["path_store"])
 
 validate()
-lmutil_list={}
-init_lmutil()
+poll_list={}
+init_polling_object()
 
 while 1:
     looptime = time.time()
