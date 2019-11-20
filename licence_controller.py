@@ -30,6 +30,11 @@ poll_methods={
         "shell_command":"linx64/lmutil lmstat -a -c %(licence_file_path)s",
         "licence_pattern":re.compile(r"^.*\"(?P<feature>\S+)|\".|\n*^\s*(?P<user>\S*)\s*(?P<host>\S*).*\s(?P<date>\d+\/\d+)\s(?P<time>[\d\:]+).*$",flags=re.M),
         "server_pattern":""
+    },
+    "null":{
+        "shell_command":"",
+        "licence_pattern":"",
+        "server_pattern":""
     }
 }
 
@@ -44,34 +49,14 @@ def init_polling_object():
     server_count=0
     feature_count=0
 
-    for key, value in licence_list.items():
+    for key, ll_value in licence_list.items():
 
-        if not value["active"]:
-            log.debug(key + " is inactive")
-            continue
-        if not value["enabled"]:
-            log.debug(key + " is disabled")
-            continue
-        if not value["licence_file_path"]:
-            log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL SHOULDNT SEE THIS")
-            continue            
-        if not value["licence_feature_name"]: 
-            log.error(key + " must have feature specified in order to check with LMUTIL SHOULDNT SEE THIS")
-            continue
-        if not value["server_poll_method"] in poll_methods.keys(): 
-            log.error(key + " must have poll method specified in order to check with LMUTIL SHOULDNT SEE THIS")
-            continue
-        if not value["server_address"]: 
-            log.error(key + " must have address specified in order to check with LMUTIL SHOULDNT SEE THIS")
-            continue
-
-        if value["server_address"] not in poll_list:
-            poll_list[value["server_address"]]={"licence_file_path":value["licence_file_path"], "server_poll_method":value["server_poll_method"], "tokens":[]}
+        if ll_value["server_address"] not in poll_list:
+            poll_list[ll_value["server_address"]]={"licence_file_path":ll_value["licence_file_path"], "server_poll_method":ll_value["server_poll_method"], "tokens":[]}
             server_count+=1
         feature_count+=1
-        poll_list[value["server_address"]]["tokens"].append(value)
+        poll_list[ll_value["server_address"]]["tokens"].append(ll_value)
     log.info(str(server_count) + " servers being polled for " + str(feature_count) + " licence features.")
-
 
 def poll():
     """Checks total of available licences for all objects passed"""
@@ -83,79 +68,78 @@ def poll():
     # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
     # server_pattern=re.compile(r".*license server (..)\s.*")
 
-    for key, value in poll_list.items():
-        log.debug("Checking Licence Server at '" + key + "'...")
-
-        # Should be able to remove this check 
-        if value["server_poll_method"] not in poll_methods:
-            log.error("Unknown poll method '" + value["server_poll_method"] + "'")
-
-        shell_command_string=poll_methods[value["server_poll_method"]]["shell_command"] % value
-        log.debug(shell_command_string)
-
-        # Clear from last loop
-        for feature_value in value["tokens"]:
-            feature_value["real_usage_all"]=0
-            feature_value["real_usage_nesi"]=0
-            feature_value["users_nesi"]={}
+    for key, ll_value in poll_list.items():
         try:
-            sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
-            log.debug(key + " OK")
-            #print(poll_methods[value["server_poll_method"]]["licence_pattern"])
-            features=poll_methods[value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
-            # Create object from output.
-            
-            # # Rather than for loop, this could be done in 1 call of regex engine.
-            last_lic={}
-            
-            for licence in features:
-                group_dic=licence.groupdict()
+            log.debug("Checking Licence Server at '" + key + "'...")
 
-                # Continue if partial match
-                if group_dic["user"] == None:
-                    last_lic=group_dic
-                    continue
+            # Should be able to remove this check 
+            if ll_value["server_poll_method"] not in poll_methods:
+                log.error("Unknown poll method '" + ll_value["server_poll_method"] + "'")
 
-                # Squash feature header
-                if group_dic["feature"] == None:
-                    if "feature" in last_lic and last_lic["feature"]!=None:
-                        group_dic["feature"]=last_lic["feature"]
-                    else:
+            shell_command_string=poll_methods[ll_value["server_poll_method"]]["shell_command"] % ll_value
+            log.debug(shell_command_string)
+
+            # Clear from last loop
+            for feature_ll_value in ll_value["tokens"]:
+                feature_ll_value["real_usage_all"]=0
+                feature_ll_value["real_usage_nesi"]=0
+                feature_ll_value["users_nesi"]={}
+            try:
+                sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
+                log.debug(key + " OK")
+                #print(poll_methods[ll_value["server_poll_method"]]["licence_pattern"])
+                features=poll_methods[ll_value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
+                # Create object from output.
+                
+                last_lic={}
+                
+                for licence in features:
+                    group_dic=licence.groupdict()
+
+                    # Continue if partial match
+                    if group_dic["user"] == None:
                         last_lic=group_dic
                         continue
 
-                if "count" not in group_dic or group_dic["count"] == None:
-                    group_dic["count"] = 1
+                    # Squash feature header
+                    if group_dic["feature"] == None:
+                        if "feature" in last_lic and last_lic["feature"]!=None:
+                            group_dic["feature"]=last_lic["feature"]
+                        else:
+                            last_lic=group_dic
+                            continue
 
-                match_cluster=cluster_pattern.match(group_dic["host"])
+                    if "count" not in group_dic or group_dic["count"] == None:
+                        group_dic["count"] = 1
 
-                # If not on nesi, set host to 'remote'
-                if match_cluster is None:
-                    group_dic["host"]="remote"
-                else:
-                    group_dic["host"]=match_cluster.group(0)
+                    match_cluster=cluster_pattern.match(group_dic["host"])
 
-                in_use=False
-                for token in value["tokens"]:
-                    # If tracked feature. Count
-                    if group_dic["feature"].lower() == token["licence_feature_name"].lower():
-                        token["real_usage_all"]+=int(group_dic["count"])
-                        in_use=True
+                    # If not on nesi, set host to 'remote'
+                    if match_cluster is None:
+                        group_dic["host"]="remote"
+                    else:
+                        group_dic["host"]=match_cluster.group(0)
 
-                        if group_dic["host"]!="remote":
-                            token["real_usage_nesi"]+=int(group_dic["count"])
+                    in_use=False
+                    for token in ll_value["tokens"]:
+                        # If tracked feature. Count
+                        if group_dic["feature"].lower() == token["licence_feature_name"].lower():
+                            token["real_usage_all"]+=int(group_dic["count"])
+                            in_use=True
 
-                            if group_dic["user"] not in token["users_nesi"]:
-                                token["users_nesi"][group_dic["user"]]={"count":0, "sockets":[]}
+                            if group_dic["host"]!="remote":
+                                token["real_usage_nesi"]+=int(group_dic["count"])
 
-                            token["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
-                            token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"])                       
-                    log.debug(json.dumps(token["users_nesi"]))
-                if group_dic["host"]=="remote" and in_use:
-                    log.info("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
-               
-                last_lic=group_dic
-                        
+                                if group_dic["user"] not in token["users_nesi"]:
+                                    token["users_nesi"][group_dic["user"]]={"count":0, "sockets":[]}
+
+                                token["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
+                                token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"])                       
+                    if group_dic["host"]=="remote" and in_use:
+                        log.info("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
+                
+                    last_lic=group_dic
+                            
 
 
             
@@ -186,17 +170,19 @@ def poll():
             #             else:
             #                 current_feature["real_usage_nesi"]+=1
             #     # Assign any tracked features
-            #     for token in value["tokens"]:
+            #     for token in ll_value["tokens"]:
             #         token.update(features[token["licence_feature_name"]])
                 
             #     log.info("Licence Server at '" + key + "' " + server_status)
+            except Exception as details:
+                log.error("Failed to fetch " + key + " " + str(details))
+                #log.info("Fully soaking " + key)
+                #ll_value["token_soak"] = ll_value["real_total"]
+                for token in ll_value["tokens"]:
+                    token["server_status"]="FAIL"
+                log.info("\rLicence Server at '" + key + "' FAIL")
         except Exception as details:
-            log.error("Failed to fetch " + key + " " + str(details))
-            #log.info("Fully soaking " + key)
-            #value["token_soak"] = value["real_total"]
-            for token in value["tokens"]:
-                token["server_status"]="FAIL"
-            log.info("\rLicence Server at '" + key + "' FAIL")
+            log.error("Failed " + key + " " + str(details))            
 
 def do_maths():    
     
@@ -265,10 +251,10 @@ def apply_soak():
     endtime=(dt.datetime.now() + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
     soak_count=""
 
-    for key, value in licence_list.items():
-        if not (value["enabled"] and value["active"] and value["token_soak"]):
+    for key, ll_value in licence_list.items():
+        if not (ll_value["enabled"] and ll_value["active"] and ll_value["token_soak"]):
             continue
-        soak_count += key + ":" + str(value["token_soak"]) + ","
+        soak_count += key + ":" + str(ll_value["token_soak"]) + ","
 
     if soak_count:
         soak_count=' licenses=' + soak_count
@@ -332,27 +318,32 @@ def get_nesi_use():
         scontrol_string_list=scontrol_string.split('\n')
         scontrol_string_list.pop(0) # First Line is bleh
 
-        for line in scontrol_string_list:
-            log.debug(line+"\n")
-            line_delimited=line.split('|')
-            licences_per_user=line_delimited[6].split(',')
-            # User may have multiple licences. Proccess for each.
-            for licence_on_user in licences_per_user:
-                licence_on_user_count=licence_on_user.split(':')[1]
-                licence_on_user_name=licence_on_user.split(':')[0]
+        try:
+            for line in scontrol_string_list:
+                log.debug(line+"\n")
+                line_delimited=line.split('|')
+                licences_per_user=line_delimited[6].split(',')
+                print(licences_per_user)
+                # User may have multiple licences. Proccess for each.
+                for licence_on_user in licences_per_user:
+                    if not licence_on_user:
+                        continue
+                    licence_on_user_count=licence_on_user.split(':')[1]
+                    licence_on_user_name=licence_on_user.split(':')[0]
 
-                if licence_on_user_name in licence_list.keys():
-                    licence_list[licence_on_user_name]["token_usage"] += int(licence_on_user_count)
-                    # Add user info here
+                    if licence_on_user_name in licence_list.keys():
+                        licence_list[licence_on_user_name]["token_usage"] += int(licence_on_user_count)
+                        # Add user info here
+                        print("pass")
 
-
-                    # Yea
-                else:
-                    log.error("Licence " + licence_on_user_name + " does not exist in licence controller.")
-                    log.info("Empty licence " + licence_on_user_name + " added to meta.")
-                    licence_meta[licence_on_user_name]={}
-                    restart()
-
+                        # Yea
+                    else:
+                        log.error("Licence " + licence_on_user_name + " does not exist in licence controller.")
+                        log.info("Empty licence " + licence_on_user_name + " added to meta.")
+                        licence_meta[licence_on_user_name]={}
+                        restart()
+        except Exception as e:
+            print(e)
 def restart():
     """Restarts licence controller"""
     log.info("Restarting licence controller...")
@@ -368,151 +359,125 @@ def validate():
         log.info("Skipping validation")
         return
 
-    log.info("Validating licence dictionary...")
+    def _fill(ll_key, ll_value):
+        """Guess at any missing properties, these replace default ll_values"""
 
-    # Adds if licence exists in meta but not list
-    for licence in licence_meta.keys():
-        if not licence in licence_list:
-            log.warning(licence + " is new licence. Being added to database wih default values.")
-            licence_list[licence] = {}
-    # Adds properties if missing from cachce (for some reason)
-    for licence in licence_list.values():
-        # Add missing values
-        for key in settings["default"].keys():
-            if key not in licence:
-                licence[key] = settings["default"][key]
-        for key in licence.keys():
-            if key not in settings["default"]:
-                log.warning("Removed defunct key '" + key + "' from something" )
-                licence.pop(key)
+        if not ll_value["license_type"] and len(ll_key.split("@")[0].split('_'))>1:
+            ll_value["license_type"] = ll_key.split("@")[0].split('_')[1]
+            log.warning(ll_key + " license_type set to " + ll_value["license_type"])
+
+        if not ll_value["software_name"]:
+            ll_value["software_name"] = ll_key.split("@")[0].split('_')[0]        
+            log.warning(ll_key + " software_name set to " + ll_value["software_name"])
+
+        if not ll_value["licence_feature_name"] and len(ll_key.split("@")[0].split('_'))>1:
+            ll_value["licence_feature_name"] = ll_key.split("@")[0].split('_')[1]
+            log.warning(ll_key + " licence_feature_name set to " + ll_value["licence_feature_name"])
+
+        if len(ll_key.split("@"))>1:
+            if not ll_value["institution"]:
+                ll_value["institution"] = ll_key.split("@")[1].split('_')[0]
+                log.warning(ll_key + " institution set to " + ll_value["institution"])
+
+            if not ll_value["faculty"] and len(ll_key.split("@")[1].split('_'))>1:
+                ll_value["faculty"] = ll_key.split("@")[1].split('_')[1]
+                log.warning(ll_key + " faculty set to " + ll_value["faculty"])
+
+        if not ll_value["licence_file_group"] and ll_value["institution"]:
+            ll_value["licence_file_group"] = ll_value["institution"]+"-org"
+            log.warning(ll_key + " licence_file_group set to " + ll_value["licence_file_group"])
         
+        if not ll_value["hourly_averages"] or not len(ll_value["hourly_averages"]) == 24:
+            ll_value["hourly_averages"] = [0] * 24
+            log.warning(ll_key + " file_group set.")
+
+        if not ll_value["server_name"]:
+            ll_value["server_name"]=ll_value["institution"]
+            if ll_value["faculty"]:
+                ll_value["server_name"] += "_" + ll_value["faculty"]
+            log.warning(ll_key + " file_group set to " + ll_value["server_name"])
+
+        if not ll_value["licence_name"]:
+            ll_value["licence_name"]=ll_value["software_name"].lower()
+            if ll_value["license_type"]:
+                ll_value["licence_name"] += "_" + ll_value["license_type"]
+            log.warning(ll_key + " file_group set to " + ll_value["licence_name"])
+
+        if not ll_value["token_name"]:
+            ll_value["token_name"]=ll_key
+            log.warning(ll_key + " token_name set to " + ll_value["token_name"])
+
+    def _address(ll_key, ll_value):
+        """Validates path attached to licence"""
+
+        filename_end = "_" + ll_value["faculty"] if ll_value["faculty"] else ""
+        standard_address = "/opt/nesi/mahuika/" + ll_value["software_name"] + "/Licenses/" + ll_value["institution"] + filename_end + ".lic"   
         
+        if ll_value["licence_file_path"]:                
+            try:
+                statdat = os.stat(ll_value["licence_file_path"])
+                file_name = ll_value["licence_file_path"].split("/")[-1]
 
+                owner = getpwuid(statdat.st_uid).pw_name
+                group = getgrgid(statdat.st_gid).gr_name
 
-        # Remove extra
+                # Check permissions of file
+                if statdat.st_mode == 432:
+                    log.error(ll_key + " file address permissions look weird.")
 
+                if ll_value["licence_file_group"] and group != ll_value["licence_file_group"]:
+                    log.error(ll_value["licence_file_path"] + ' group is "' + group + '", should be "' + ll_value["licence_file_group"] + '".')
 
-    def _fill(licence_list):
-        """Guess at any missing properties"""
-        for key, value in licence_list.items():
-            
-            if not value["license_type"] and len(key.split("@")[0].split('_'))>1:
-                value["license_type"] = key.split("@")[0].split('_')[1]
-                log.warning(key + " license_type set to " + value["license_type"])
+                if owner != settings["user"]:
+                    log.error(ll_value["licence_file_path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
+                        
+                if ll_value["licence_file_path"] != standard_address and ll_value["software_name"] and ll_value["institution"]:
+                    log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
 
-            if not value["software_name"]:
-                value["software_name"] = key.split("@")[0].split('_')[0]        
-                log.warning(key + " software_name set to " + value["software_name"])
-
-            if not value["licence_feature_name"] and len(key.split("@")[0].split('_'))>1:
-                value["licence_feature_name"] = key.split("@")[0].split('_')[1]
-                log.warning(key + " licence_feature_name set to " + value["licence_feature_name"])
-
-            if len(key.split("@"))>1:
-                if not value["institution"]:
-                    value["institution"] = key.split("@")[1].split('_')[0]
-                    log.warning(key + " institution set to " + value["institution"])
-
-                if not value["faculty"] and len(key.split("@")[1].split('_'))>1:
-                    value["faculty"] = key.split("@")[1].split('_')[1]
-                    log.warning(key + " faculty set to " + value["faculty"])
-
-            if not value["licence_file_group"] and value["institution"]:
-                value["licence_file_group"] = value["institution"]+"-org"
-                log.warning(key + " licence_file_group set to " + value["licence_file_group"])
-            
-            if not value["hourly_averages"] or not len(value["hourly_averages"]) == 24:
-                value["hourly_averages"] = [0] * 24
-                log.warning(key + " file_group set.")
-
-            if not value["server_name"]:
-                value["server_name"]=value["institution"]
-                if value["faculty"]:
-                    value["server_name"] += "_" + value["faculty"]
-                log.warning(key + " file_group set to " + value["server_name"])
-
-            if not value["licence_name"]:
-                value["licence_name"]=value["software_name"].lower()
-                if value["license_type"]:
-                    value["licence_name"] += "_" + value["license_type"]
-                log.warning(key + " file_group set to " + value["licence_name"])
-
-            if not value["token_name"]:
-                value["token_name"]=key
-                log.warning(key + " token_name set to " + value["token_name"])
-
-    def _address(licence_list, licence_meta):
-        for key, value in licence_list.items():
-
-            filename_end = "_" + value["faculty"] if value["faculty"] else ""
-            standard_address = "/opt/nesi/mahuika/" + value["software_name"] + "/Licenses/" + value["institution"] + filename_end + ".lic"   
-            
-            if value["licence_file_path"]:                
+                # Read lic file contents
                 try:
-                    statdat = os.stat(value["licence_file_path"])
-                    file_name = value["licence_file_path"].split("/")[-1]
-
-                    owner = getpwuid(statdat.st_uid).pw_name
-                    group = getgrgid(statdat.st_gid).gr_name
-
-                    # Check permissions of file
-                    if statdat.st_mode == 432:
-                        log.error(key + " file address permissions look weird.")
-
-                    if value["licence_file_group"] and group != value["licence_file_group"]:
-                        log.error(value["licence_file_path"] + ' group is "' + group + '", should be "' + value["licence_file_group"] + '".')
-
-                    if owner != settings["user"]:
-                        log.error(value["licence_file_path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
-                            
-                    if value["licence_file_path"] != standard_address and value["software_name"] and value["institution"]:
-                        log.debug('Would be cool if "' + value["licence_file_path"] + '" was "' + standard_address + '".')
-
-                    # Read lic file contents
-                    try:
-                        with open(value["licence_file_path"]) as file:
-                            sub_out = file.readline().split()
-                    except Exception as details:
-                        log.error("Failed to check " + key + " licence file contents at " + value["licence_file_path"] + ": " + str(details))
-                    else:
-                        if len(sub_out)<4:
-                            log.error(key + "Licence File is missing details.")
-                        else:
-                            if value["server_address"] and value["server_address"]!=sub_out[1]:
-                                log.error(key + " server_address does not match recorded one.")
-                            if ( not value["server_address"] ) and sub_out[1]:
-                                value["server_address"]=sub_out[1]
-                                log.info(key + " server_address set to " + sub_out[1])
-
-                            if value["server_host_id"] and value["server_host_id"]!=sub_out[2]:
-                                log.error(key + " server_host_id does not match recorded one.")
-                            if ( not value["server_host_id"] ) and sub_out[2]:
-                                value["server_host_id"]=sub_out[2]
-                                log.info(key + " server_host_id set to " + sub_out[2])
-
-                            if value["server_port"] and value["server_port"]!=sub_out[3]:
-                                log.error(key + " server_port does not match recorded one.")
-                            if ( not value["server_port"] ) and sub_out[3]:
-                                value["server_port"]=sub_out[3]
-                                log.info(key + " server_port set to " + sub_out[3])            
-
+                    with open(ll_value["licence_file_path"]) as file:
+                        sub_out = file.readline().split()
                 except Exception as details:
-                    log.error(key + ' has an invalid file path attached: "' + str(details))
-            else:
-                value["licence_file_path"]=standard_address
-                log.warning(key + " licence path set to " + standard_address)
+                    log.error("Failed to check " + ll_key + " licence file contents at " + ll_value["licence_file_path"] + ": " + str(details))
+                else:
+                    if len(sub_out)<4:
+                        log.error(ll_key + "Licence File is missing details.")
+                    else:
+                        if ll_value["server_address"] and ll_value["server_address"]!=sub_out[1]:
+                            log.error(ll_key + " server_address does not match recorded one.")
+                        if ( not ll_value["server_address"] ) and sub_out[1]:
+                            ll_value["server_address"]=sub_out[1]
+                            log.info(ll_key + " server_address set to " + sub_out[1])
+
+                        if ll_value["server_host_id"] and ll_value["server_host_id"]!=sub_out[2]:
+                            log.error(ll_key + " server_host_id does not match recorded one.")
+                        if ( not ll_value["server_host_id"] ) and sub_out[2]:
+                            ll_value["server_host_id"]=sub_out[2]
+                            log.info(ll_key + " server_host_id set to " + sub_out[2])
+
+                        if ll_value["server_port"] and ll_value["server_port"]!=sub_out[3]:
+                            log.error(ll_key + " server_port does not match recorded one.")
+                        if ( not ll_value["server_port"] ) and sub_out[3]:
+                            ll_value["server_port"]=sub_out[3]
+                            log.info(ll_key + " server_port set to " + sub_out[3])            
+
+            except Exception as details:
+                log.error(ll_key + ' has an invalid file path attached: "' + str(details))
+        else:
+            ll_value["licence_file_path"]=standard_address
+            log.warning(ll_key + " licence path set to " + standard_address)
 
     def _tokens(license_list):
         #Try get list of current slurm tokens
         # Try to fix a token if incorrect.
         def __update_token_count():
-
             log.info("Attempting to modify SLURM token " + key)
 
-            if not (value["institution"] and value["real_total"] and value["software_name"]):         
+            if not (ll_value["institution"] and ll_value["real_total"] and ll_value["software_name"]):         
                 raise Exception("Token not created. Missing one or more of 'instituiton', 'software_name', 'real_total'.")               
             
-            sub_input="sacctmgr -i modify resource Name=" + value["licence_name"] + " Server=" + value["server_name"] + " set Count=" + str(correct_count)
+            sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " set Count=" + str(correct_count)
 
             if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
                 raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
@@ -526,10 +491,10 @@ def validate():
 
             log.info("Attempting to modify SLURM token " + key + " for " + cluster)
 
-            if not (value["institution"] and value["real_total"] and value["software_name"]):         
+            if not (ll_value["institution"] and ll_value["real_total"] and ll_value["software_name"]):         
                 raise Exception("Token not created. Missing one or more of 'instituiton', 'software_name', 'real_total'.")               
             
-            sub_input="sacctmgr -i modify resource Name=" + value["licence_name"] + " Server=" + value["server_name"] +  " set percentallowed=" + str(correct_share) + " where cluster=" + cluster
+            sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] +  " set percentallowed=" + str(correct_share) + " where cluster=" + cluster
 
             if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
                 raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
@@ -542,10 +507,10 @@ def validate():
         def __create_token(cluster):
             log.info("Attempting to create SLURM token " + key + " for " + cluster)
 
-            if not (value["institution"] and value["real_total"] and value["software_name"]):         
+            if not (ll_value["institution"] and ll_value["real_total"] and ll_value["software_name"]):         
                 raise Exception("Token not created. Missing one or more of 'instituiton', 'software_name', 'real_total'.")               
 
-            sub_input="sacctmgr -i add resource Name=" + value["licence_name"] + " Server=" + value["server_name"] + " Count=" + str(correct_count) + " Type=License percentallowed=" + str(correct_share) +" where cluster=" + cluster
+            sub_input="sacctmgr -i add resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " Count=" + str(correct_count) + " Type=License percentallowed=" + str(correct_share) +" where cluster=" + cluster
 
             if slurm_permissions!="administrator":          
                 raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
@@ -563,7 +528,6 @@ def validate():
         else:
             active_token_dict = {}
 
-            
             #log.info("Tokens being divided between " + str(number_clusters) + " clusters.")
 
             # Format output data into dictionary 
@@ -573,7 +537,7 @@ def validate():
                 str_arr=lic_string.split("|")
                 active_token_dict[str_arr[0] + "@" + str_arr[1]]=str_arr
 
-            for key, value in licence_list.items():
+            for key, ll_value in licence_list.items():
 
 
                 # SLURM requires that each cluster is given a fraction of the full licence pool. 
@@ -582,15 +546,15 @@ def validate():
                 # TO IMPLIMENT
                 # Temporary allocations need to be made to correspond to scheduled licence useage on other cluster.
 
-                number_clusters=len(value["clusters"])
+                number_clusters=len(ll_value["clusters"])
                 
                 if number_clusters < 1 :
                     log.error(key + " not active on any clusters?")
                     continue
 
                 correct_share=int(100/number_clusters)
-                correct_count=value["real_total"] *  number_clusters
-                log.info("Licence '" + key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(value["clusters"])) + " ).")
+                correct_count=ll_value["real_total"] *  number_clusters
+                log.info("Licence '" + key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(ll_value["clusters"])) + " ).")
 
                 if key not in active_token_dict.keys():
                     log.error(key + " not in SACCT database. Attempting to add.")
@@ -602,8 +566,8 @@ def validate():
 
                         log.info("Disabling licence " + key + ".")
 
-                        value["enabled"]=False
-                        value["server_status"]="NULL_TOKEN"                    
+                        ll_value["enabled"]=False
+                        ll_value["server_status"]="NULL_TOKEN"                    
                     else:
                         log.info("SLURM token successfully added.")
 
@@ -615,50 +579,49 @@ def validate():
 
                 if correct_share != actual_share:
                     log.error(key + " has cluster share incorrectly set in SACCT database ( '" + str(actual_share) +  "' should be '" + str(correct_share) + "'). Attempting to fix.")
-                    try:
-                        for cluster in value["clusters"]:
-                            __update_token_share(cluster)
-                    except Exception as details:
-                        log.error("Failed to update SLURM token: " + str(details))
-                        log.info("Disabling licence " + key + ".")
+                    if fix_slurm_share:
+                        try:
+                            for cluster in ll_value["clusters"]:
+                                __update_token_share(cluster)
+                        except Exception as details:
+                            log.error("Failed to update SLURM token: " + str(details))
+                            log.info("Disabling licence " + key + ".")
 
-                        value["enabled"]=False
-                        value["server_status"]="SELFISH_TOKEN"
-                    else:
-                        log.info("SLURM token successfully updated.")
-
-                    continue
+                            ll_value["enabled"]=False
+                            ll_value["server_status"]="SELFISH_TOKEN"
+                        else:
+                            log.info("SLURM token successfully updated.")
+                    
 
                 if correct_count != actual_count:
                 
                     log.error(key + " has count incorrectly set in SACCT database. Attempting to fix.")
-                    try:
-                        __update_token_count()
-                    except Exception as details:
-                        log.error("Failed to update SLURM token: " + str(details))
-                        log.info("Disabling licence " + key + ".")
+                    if fix_slurm_count:
+                        try:
+                            __update_token_count()
+                        except Exception as details:
+                            log.error("Failed to update SLURM token: " + str(details))
+                            log.info("Disabling licence " + key + ".")
 
-                        value["enabled"]=False
-                        value["server_status"]="WRONG_TOKEN"
-                    else:
-                        log.info("SLURM token successfully updated.")
-
-                    continue
+                            ll_value["enabled"]=False
+                            ll_value["server_status"]="WRONG_TOKEN"
+                        else:
+                            log.info("SLURM token successfully updated.")
                 
                 if actual_count==0:
-                    value["enabled"]=False
-                    value["server_status"]="ZERO_TOKEN"
+                    ll_value["enabled"]=False
+                    ll_value["server_status"]="ZERO_TOKEN"
 
                     log.error(key + " has 0 tokens in slurm db. Disabling.")
                     continue
 
                     # else:
                     #     If total on licence server does not match total slurm tokens, update slurm tokens.
-                    #     if value["real_total"] != int(active_token_dict[key][3])/2 and value["real_total"]!=0:
-                    #         log.error("SLURM TOKEN BAD, HAS " + str(int(active_token_dict[key][3])/2)  + " and should be " + str(value["total"]))
+                    #     if ll_value["real_total"] != int(active_token_dict[key][3])/2 and ll_value["real_total"]!=0:
+                    #         log.error("SLURM TOKEN BAD, HAS " + str(int(active_token_dict[key][3])/2)  + " and should be " + str(ll_value["total"]))
                     #         if slurm_permissions=="operator" or slurm_permissions=="administrator":
                     #             try:
-                    #                 sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"].lower() + " set Count=" + str(int(value["real_total"]*2))
+                    #                 sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"].lower() + " Server=" + ll_value["server_name"].lower() + " set Count=" + str(int(ll_value["real_total"]*2))
                     #                 log.debug(sub_input)
                     #                 subprocess.check_output(sub_input, shell=True)        
                     #             except Exception as details:
@@ -672,11 +635,11 @@ def validate():
                     #         log.error("SLURM token not cluster-split")
                     #         if slurm_permissions=="operator" or slurm_permissions=="administrator":
                     #             try:
-                    #                 sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + " percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
+                    #                 sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"].lower() + " Server=" + ll_value["server_name"] + " percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
                     #                 log.debug(sub_input)
                     #                 subprocess.check_output(sub_input, shell=True)
 
-                    #                 sub_input="sacctmgr -i modify resource Name=" + value["licence_name"].lower() + " Server=" + value["server_name"] + " percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
+                    #                 sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"].lower() + " Server=" + ll_value["server_name"] + " percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
                     #                 log.debug(sub_input)
                     #                 subprocess.check_output(sub_input, shell=True)
                     #             except Exception as details:
@@ -686,26 +649,56 @@ def validate():
                     #         else:
                     #             log.error("User does not have required SLURM permissions to fix SLURM tokens.")
 
-    def _clusters(licence_list, module_list):
-        print("Checking clusters")
+    def _clusters(ll_key, ll_value, module_list):
 
         for module, module_value in module_list["modules"].items():
-            
-            for licence_key, licence_value in licence_list.items():
-                if licence_value["software_name"].lower() == module.lower():
-                    log.debug(licence_key +" exists as module")
+            if ll_value["software_name"].lower() == module.lower():
+                    log.debug(ll_key +" exists as module")
                     log.debug(",".join(module_value["machines"]))
                     for cluster in module_value["machines"].keys():
-                        if cluster not in licence_value["clusters"]:
-                            licence_value["clusters"].append(cluster.lower())
-                            log.info(cluster.lower() + " added to " + licence_key )
-            
-    _clusters(licence_list, module_list)
-    _fill(licence_list)
-    _address(licence_list, licence_meta)
+                        if cluster not in ll_value["clusters"]:
+                            ll_value["clusters"].append(cluster.lower())
+                            log.info(cluster.lower() + " added to " + ll_key)
+      
+    log.info("Validating licence dictionary...")
+
+    # Adds if licence exists in meta but not list
+    for licence in licence_meta.keys():
+        if not licence in licence_list:
+            log.warning(licence + " is new licence. Being added to database wih default ll_values.")
+            licence_list[licence] = {}
+        
+    for ll_key, ll_value in licence_list.items():
+        # Add missing values   
+        for key in settings["default"].keys():
+            if key not in ll_value:
+                    ll_value[key] = settings["default"][key]
+        # Remove extra values  
+        for key in ll_value.keys():
+            if key not in settings["default"]:
+                log.warning("Removed defunct key '" + key + "' from something" )
+                ll_value.pop(key)
+
+        _clusters(ll_key, ll_value, module_list)
+        _fill(ll_key, ll_value)
+        _address(ll_key, ll_value)
+
+        # if not ll_value["licence_file_path"]:
+        #     log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL SHOULDNT SEE THIS")
+        #     continue            
+        # if not ll_value["licence_feature_name"]: 
+        #     log.error(key + " must have feature specified in order to check with LMUTIL SHOULDNT SEE THIS")
+        #     continue
+        # if not ll_value["server_poll_method"] in poll_methods.keys(): 
+        #     log.error(key + " must have poll method specified in order to check with LMUTIL SHOULDNT SEE THIS")
+        #     continue
+        # if not ll_value["server_address"]: 
+        #     log.error(key + " must have address specified in order to check with LMUTIL SHOULDNT SEE THIS")
+        #     continue
+
+
     _tokens(licence_list)
     c.deep_merge(licence_meta, licence_list)
-
     c.writemake_json(settings["path_store"], licence_list)
 
 def get_slurm_permssions():
@@ -730,7 +723,6 @@ def main():
     apply_soak()
 
     print_panel()
-    #print(json.dumps(licence_list))
     c.writemake_json(settings["path_store"], licence_list)
 
     
@@ -739,6 +731,10 @@ module_list = c.readmake_json(settings["path_modulelist"])
 
 log.info("Starting...")
 slurm_permissions=get_slurm_permssions()
+
+#Settings need to be fixed
+fix_slurm_share=True
+fix_slurm_count=True
 
 # Is correct user
 if os.environ["USER"] != settings["user"] and not os.environ.get("CHECKUSER","").lower()=="false":
@@ -764,33 +760,33 @@ while 1:
     log.info("main loop time = " + str(time.time() - looptime))
     time.sleep(max(settings["poll_period"] - (time.time() - looptime), 0))
 
-    # for key, value in licence_list.items():
+    # for key, ll_value in licence_list.items():
     # hour_index = dt.datetime.now().hour - 1
-    # value["in_use_real"] = int(feature["in_use_real"])
+    # ll_value["in_use_real"] = int(feature["in_use_real"])
 
-    # if value["total"] != int(feature["total"]):
-    #     log.warning("LMUTIL shows different total number of licences than recorded. Changing from '" + str(value["total"]) + "' to '" + feature["total"] + "'")
-    #     value["total"] = int(feature["total"])
+    # if ll_value["total"] != int(feature["total"]):
+    #     log.warning("LMUTIL shows different total number of licences than recorded. Changing from '" + str(ll_value["total"]) + "' to '" + feature["total"] + "'")
+    #     ll_value["total"] = int(feature["total"])
 
     # # Record to running history
-    # value["history"].append(value["in_use_real"])
+    # ll_value["history"].append(ll_value["in_use_real"])
 
     # # Pop extra array entries
-    # while len(value["history"]) > value["history_points"]:
-    #     value["history"].pop(0)
+    # while len(ll_value["history"]) > ll_value["history_points"]:
+    #     ll_value["history"].pop(0)
 
-    # # Find modified in use value
-    # interesting = max(value["history"])-value["in_use_nesi"]
-    # value["soak"] = round(min(
-    #     max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["total"]
+    # # Find modified in use ll_value
+    # interesting = max(ll_value["history"])-ll_value["in_use_nesi"]
+    # ll_value["soak"] = round(min(
+    #     max(interesting + ll_value["buffer_constant"], interesting * (1 + ll_value["buffer_factor"]),0), ll_value["total"]
     # ))
 
     # # Update average
-    # value["day_ave"][hour_index] = (
+    # ll_value["day_ave"][hour_index] = (
     #     round(
-    #         ((value["in_use_real"] * settings["point_weight"]) + (value["day_ave"][hour_index] * (1 - settings["point_weight"]))),
+    #         ((ll_value["in_use_real"] * settings["point_weight"]) + (ll_value["day_ave"][hour_index] * (1 - settings["point_weight"]))),
     #         2,
     #     )
-    #     if value["day_ave"][hour_index]
-    #     else value["in_use_real"]
+    #     if ll_value["day_ave"][hour_index]
+    #     else ll_value["in_use_real"]
     # )
