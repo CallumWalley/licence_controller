@@ -650,7 +650,6 @@ def validate():
                     #             log.error("User does not have required SLURM permissions to fix SLURM tokens.")
 
     def _clusters(ll_key, ll_value, module_list):
-
         for module, module_value in module_list["modules"].items():
             if ll_value["software_name"].lower() == module.lower():
                     log.debug(ll_key +" exists as module")
@@ -755,6 +754,7 @@ while 1:
     try:
         main()
     except Exception as details:
+        print(sys.exc_info())
         log.error("Main loop failed: " + str(details))
 
     log.info("main loop time = " + str(time.time() - looptime))
