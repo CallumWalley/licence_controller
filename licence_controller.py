@@ -152,8 +152,7 @@ def poll():
 
                         token["server_status"]="OK"    
                                             
-                    if group_dic["host"].strip()=="remote" and in_use:
-                        print(group_dic["host"])
+                    if group_dic["host"].strip()!="remote" and in_use:
                         log.info("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
                 
                     last_lic=group_dic
