@@ -460,7 +460,7 @@ def validate():
                     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
 
                 # Read lic file contents
-                if ll_value["server_poll_method"]="lmutil":
+                if ll_value["server_poll_method"]=="lmutil":
                     try:
                         with open(ll_value["licence_file_path"]) as file:
                             sub_out = file.readline().split()
