@@ -91,10 +91,6 @@ def poll():
         try:
             log.debug("Checking Licence Server at '" + key + "'...")
 
-            # Should be able to remove this check 
-            if ll_value["server_poll_method"] not in poll_methods:
-                log.error("Unknown poll method '" + ll_value["server_poll_method"] + "'")
-
             shell_command_string=poll_methods[ll_value["server_poll_method"]]["shell_command"] % ll_value
             log.debug(shell_command_string)
 
@@ -153,7 +149,9 @@ def poll():
 
                                 token["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
                                 token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"]) 
-                                token["server_status"]="OK"                    
+
+                        token["server_status"]="OK"    
+                    print(group_dic["host"])                        
                     if group_dic["host"]=="remote" and in_use:
                         log.info("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
                 
