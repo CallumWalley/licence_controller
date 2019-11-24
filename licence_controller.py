@@ -240,14 +240,16 @@ def do_maths():
 def apply_soak():
 
     def _update_res(cluster, soak_count):
-        log.info("Attempting to update Maui reservation.")
+        log.info("Attempting to update " + cluster + " reservation.")
 
         sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + " " + soak_count
         ex_slurm_command(sub_input,"operator")
 
     def _create_res(cluster, soak_count):
-            sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=now Duration=infinite Users=root Flags=LICENSE_ONLY " + soak_count
-            ex_slurm_command(sub_input)
+        log.info("Attempting to update " + cluster + " reservation.")
+
+        sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=now Duration=infinite Users=root Flags=LICENSE_ONLY " + soak_count
+        ex_slurm_command(sub_input)
 
     if os.environ.get("SOAK","").lower() == "false":
         log.info("Licence Soak skipped due to 'SOAK=FALSE'")
@@ -505,10 +507,6 @@ def validate():
                 raise Exception("Token not created. Missing 'software_name'")
 
             sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " set Count=" + str(correct_count)
-
-            if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
-                raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
-
             ex_slurm_command(sub_input,"operator")
 
         def __update_token_share(cluster):
