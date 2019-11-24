@@ -37,7 +37,6 @@ poll_methods={
         "server_pattern":""
     }
 }
-
 untracked={}
 
 def init_polling_object():
@@ -87,7 +86,6 @@ def poll():
             try:
                 sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
                 log.debug(key + " OK")
-                #print(poll_methods[ll_value["server_poll_method"]]["licence_pattern"])
                 features=poll_methods[ll_value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
                 # Create object from output.
                 
@@ -222,9 +220,10 @@ def do_maths():
 
 def apply_soak():
 
-    def _update_res(cluster):
+    def _update_res(cluster, soak_count):
+        log.info("Attempting to update Maui reservation.")
 
-        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + ' EndTime=' + endtime + " " + soak_count
+        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + " " + soak_count
         log.debug(sub_input)
 
         if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
@@ -232,8 +231,8 @@ def apply_soak():
         
         subprocess.check_output(sub_input, shell=True).decode("utf-8")
 
-    def _create_res(cluster):
-            sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=" + starttime + " EndTime=" + endtime +  " Users=root Flags=LICENSE_ONLY " + soak_count
+    def _create_res(cluster, soak_count):
+            sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=now Duration=infinite Users=root Flags=LICENSE_ONLY " + soak_count
 
             if slurm_permissions!="administrator":          
                 raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
@@ -247,31 +246,48 @@ def apply_soak():
 
     log.info("Applying soak...")
     res_name = "licence_soak"
-    starttime=(dt.datetime.now() + dt.timedelta(seconds=20)).strftime("%Y-%m-%dT%H:%M:%S")
-    endtime=(dt.datetime.now() + dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
-    soak_count=""
 
-    for key, ll_value in licence_list.items():
-        if not (ll_value["enabled"] and ll_value["active"] and ll_value["token_soak"]):
+    res_update_strings={}
+    for ll_key, ll_value in licence_list.items():
+
+        #print(str(ll_value["enabled"]) + "    "  + str(ll_value["active"]))
+
+        if (ll_value["enabled"] and ll_value["active"]):
+            #print("loops")
+
+            for cluster in ll_value["clusters"]:
+
+                if cluster not in res_update_strings:
+
+                    res_update_strings[cluster] =  " licenses="
+                
+                res_update_strings[cluster] += ll_key + ":" + str(ll_value["token_soak"]) + ","    
+
+    log.debug("Contructing reservation strings")
+    log.debug(json.dumps(res_update_strings))
+    for cluster, soak in res_update_strings.items():
+        print(cluster not in settings["clusters"])
+        print(not settings["clusters"][cluster])
+
+        if cluster not in settings["clusters"] or not settings["clusters"][cluster]:
+            log.warning("Skipping licence soak on " + cluster)
             continue
-        soak_count += key + ":" + str(ll_value["token_soak"]) + ","
+        print(cluster)
+        try:
 
-    if soak_count:
-        soak_count=' licenses=' + soak_count
-    try:
-        _update_res("mahuika")
-    except Exception as details:
-        log.error("Reservation update failed: " + str(details))
-        log.info("Attempting to create new reservation.")
-        try: 
-            _create_res("mahuika")
+            _update_res(cluster, soak)
+
         except Exception as details:
-            log.error("Failed to create reservation: " + str(details))
+            log.error("Reservation update failed: " + str(details))
+            log.info("Attempting to create new reservation.")
+            try: 
+                _create_res(cluster, soak)
+            except Exception as details:
+                log.error("Failed to create reservation: " + str(details))
+            else:
+                log.info("New reservation '" + res_name + "' created successfully.")
         else:
-            log.info("New reservation '" + res_name + "' created successfully.")
-
-    else:
-        log.info("Reservation updated successfully!")
+            log.info( cluster + " reservation updated successfully!")
 
 def print_panel():
     hour_index = dt.datetime.now().hour - 1
@@ -323,7 +339,6 @@ def get_nesi_use():
                 log.debug(line+"\n")
                 line_delimited=line.split('|')
                 licences_per_user=line_delimited[6].split(',')
-                print(licences_per_user)
                 # User may have multiple licences. Proccess for each.
                 for licence_on_user in licences_per_user:
                     if not licence_on_user:
@@ -334,7 +349,6 @@ def get_nesi_use():
                     if licence_on_user_name in licence_list.keys():
                         licence_list[licence_on_user_name]["token_usage"] += int(licence_on_user_count)
                         # Add user info here
-                        print("pass")
 
                         # Yea
                     else:
