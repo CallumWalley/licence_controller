@@ -54,7 +54,7 @@ def ex_slurm_command(sub_input, level="administrator"):
     else:
         
         with open("run_as_admin.sh","a+") as f:
-            f.write(sub_input)
+            f.write(sub_input+"\n")
         log.error("Writing command to 'run_as_admin.sh'")
 
         raise Exception("User does not have appropriate SLURM permissions to run this command.")
