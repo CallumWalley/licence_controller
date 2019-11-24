@@ -90,7 +90,7 @@ def poll():
     for key, ll_value in poll_list.items():
         try:
             log.debug("Checking Licence Server at '" + key + "'...")
-
+            print(ll_value)
             shell_command_string=poll_methods[ll_value["server_poll_method"]]["shell_command"] % ll_value
             log.debug(shell_command_string)
 
@@ -140,8 +140,6 @@ def poll():
                         if group_dic["feature"].lower().strip() == token["licence_feature_name"].lower():
                             token["real_usage_all"]+=int(group_dic["count"])
                             tracked_on_nesi=True
-                            print(group_dic["feature"].lower())
-                            print(token["licence_feature_name"].lower())
                             if group_dic["host"]!="remote":
                                 
                                 token["real_usage_nesi"]+=int(group_dic["count"])
