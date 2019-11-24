@@ -91,7 +91,6 @@ def poll():
     for key, ll_value in poll_list.items():
         try:
             log.debug("Checking Licence Server at '" + key + "'...")
-            print(ll_value)
             shell_command_string=poll_methods[ll_value["server_poll_method"]]["shell_command"] % ll_value
             log.debug(shell_command_string)
 
@@ -260,10 +259,7 @@ def apply_soak():
     res_update_strings={}
     for ll_key, ll_value in licence_list.items():
 
-        #print(str(ll_value["enabled"]) + "    "  + str(ll_value["active"]))
-
         if (ll_value["enabled"] and ll_value["active"]):
-            #print("loops")
 
             for cluster in ll_value["clusters"]:
 
@@ -486,7 +482,6 @@ def validate():
                                 log.info(ll_key + " server_port set to " + sub_out[3])            
                     elif ll_value["server_poll_method"]=="ansysli_util":
                         match_address=poll_methods[ll_value["server_poll_method"]]["details_pattern"].match(sub_out).groupdict()
-                        print(match_address)
                         ll_value["server_address"]=match_address["server_address"]
                         ll_value["server_port"]=match_address["server_port"]
 
