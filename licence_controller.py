@@ -134,14 +134,14 @@ def poll():
                     else:
                         group_dic["host"]=match_cluster.group(0)
 
-                    in_use=False
+                    tracked_on_nesi=False
                     for token in ll_value["tokens"]:
                         # If tracked feature. Count
                         if group_dic["feature"].lower() == token["licence_feature_name"].lower():
                             token["real_usage_all"]+=int(group_dic["count"])
-                            in_use=True
-
+                            tracked_on_nesi=True
                             if group_dic["host"]!="remote":
+                                
                                 token["real_usage_nesi"]+=int(group_dic["count"])
 
                                 if group_dic["user"] not in token["users_nesi"]:
@@ -152,8 +152,8 @@ def poll():
 
                         token["server_status"]="OK"    
                                             
-                    if group_dic["host"].strip()!="remote" and in_use:
-                        log.info("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
+                    if group_dic["host"].strip()!="remote" and not tracked_on_nesi:
+                        log.warning("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
                 
                     last_lic=group_dic
                             
