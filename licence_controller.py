@@ -39,6 +39,27 @@ poll_methods={
 }
 untracked={}
 
+def ex_slurm_command(sub_input, level="administrator"):
+    log.debug("Attempting to run SLURM command '" + sub_input + "'.")
+    if (level=="administrator" and slurm_permissions=="administrator") or (level=="operator" and (slurm_permissions=="operator" or slurm_permissions=="administrator")):
+        try:
+            output=subprocess.check_output(sub_input, shell=True).decode("utf-8")
+        except Exception as details:
+            raise Exception("Failed to execute SLURM command '"+ sub_input + "':" + str(details))   
+        else:
+            log.debug("Success!")
+            time.sleep(5) #Avoid spamming database
+            return output
+    else:
+        
+        with open("run_as_admin.sh","a+") as f:
+            f.write(sub_input)
+        log.error("Writing command to 'run_as_admin.sh'")
+
+        raise Exception("User does not have appropriate SLURM permissions to run this command.")
+
+
+
 def init_polling_object():
     # Some Servers have multiple features being tracked.
     # Consolidate licence servers to avoid making multiple calls.
@@ -60,7 +81,6 @@ def init_polling_object():
 def poll():
     """Checks total of available licences for all objects passed"""
         
-
     log.info("Polling...")
 
     # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
@@ -132,7 +152,8 @@ def poll():
                                     token["users_nesi"][group_dic["user"]]={"count":0, "sockets":[]}
 
                                 token["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
-                                token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"])                       
+                                token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"]) 
+                                token["server_status"]="OK"                    
                     if group_dic["host"]=="remote" and in_use:
                         log.info("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
                 
@@ -224,21 +245,11 @@ def apply_soak():
         log.info("Attempting to update Maui reservation.")
 
         sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + " " + soak_count
-        log.debug(sub_input)
-
-        if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
-            raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input+ "'")
-        
-        subprocess.check_output(sub_input, shell=True).decode("utf-8")
+        ex_slurm_command(sub_input,"operator")
 
     def _create_res(cluster, soak_count):
             sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=now Duration=infinite Users=root Flags=LICENSE_ONLY " + soak_count
-
-            if slurm_permissions!="administrator":          
-                raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
-
-            log.debug(sub_input)
-            subprocess.check_output(sub_input, shell=True).decode("utf-8")
+            ex_slurm_command(sub_input)
 
     if os.environ.get("SOAK","").lower() == "false":
         log.info("Licence Soak skipped due to 'SOAK=FALSE'")
@@ -322,7 +333,7 @@ def get_nesi_use():
     log.debug(sub_input)
 
     try:
-        scontrol_string=subprocess.check_output(sub_input, shell=True).decode("utf-8").strip()
+        scontrol_string=ex_slurm_command(sub_input,"operator")
     except Exception as details:
         log.error("Failed to check scontrol licence usage. " + str(details))
     else:
@@ -488,18 +499,19 @@ def validate():
         def __update_token_count():
             log.info("Attempting to modify SLURM token " + key)
 
-            if not (ll_value["institution"] and ll_value["real_total"] and ll_value["software_name"]):         
-                raise Exception("Token not created. Missing one or more of 'instituiton', 'software_name', 'real_total'.")               
-            
+            if not ll_value["institution"]:         
+                raise Exception("Token not created. Missing 'instituiton'.")               
+            if not ll_value["real_total"]:         
+                raise Exception("Token not created. Missing 'real_total'.")   
+            if not ll_value["software_name"]:         
+                raise Exception("Token not created. Missing 'software_name'")
+
             sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " set Count=" + str(correct_count)
 
             if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
                 raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
 
-            log.debug(sub_input)
-            subprocess.check_output(sub_input, shell=True).decode("utf-8")
-
-            time.sleep(5)
+            ex_slurm_command(sub_input,"operator")
 
         def __update_token_share(cluster):
 
@@ -513,9 +525,7 @@ def validate():
             if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
                 raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
 
-            log.debug(sub_input)
-            subprocess.check_output(sub_input, shell=True).decode("utf-8")
-            time.sleep(5)
+            ex_slurm_command(sub_input,"operator")
 
         #Try to create  a token if missing.
         def __create_token(cluster):
@@ -526,17 +536,12 @@ def validate():
 
             sub_input="sacctmgr -i add resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " Count=" + str(correct_count) + " Type=License percentallowed=" + str(correct_share) +" where cluster=" + cluster
 
-            if slurm_permissions!="administrator":          
-                raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
-
-            log.debug(sub_input)
-            subprocess.check_output(sub_input, shell=True).decode("utf-8")
-            time.sleep(5)
+            ex_slurm_command(sub_input)
 
         try:
             sub_input="sacctmgr -pns show resource withcluster"
             log.debug(sub_input)
-            string_data=subprocess.check_output(sub_input, shell=True).decode("utf-8").strip()
+            string_data=ex_slurm_command(sub_input, "operator").strip()
         except Exception as details:
             log.error("Failed to check SLURM tokens. " + str(details))
         else:
