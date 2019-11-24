@@ -151,8 +151,9 @@ def poll():
                                 token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"]) 
 
                         token["server_status"]="OK"    
-                    print(group_dic["host"])                        
-                    if group_dic["host"]=="remote" and in_use:
+                                            
+                    if group_dic["host"].strip()=="remote" and in_use:
+                        print(group_dic["host"])
                         log.info("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
                 
                     last_lic=group_dic
