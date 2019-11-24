@@ -562,7 +562,7 @@ def validate():
                 # However this means if multiple pulls of tokens are made across 2 clusters SLURM will be suprised when the licence tracker catches up with the token count.
                 # TO IMPLIMENT
                 # Temporary allocations need to be made to correspond to scheduled licence useage on other cluster.
-
+                
                 number_clusters=len(ll_value["clusters"])
                 
                 if number_clusters < 1 :
@@ -599,6 +599,8 @@ def validate():
                     if fix_slurm_share:
                         try:
                             for cluster in ll_value["clusters"]:
+                                if cluster not in settings["clusters"] or (not settings["clusters"][cluster]["enabled"]):
+                                    continue
                                 __update_token_share(cluster)
                         except Exception as details:
                             log.error("Failed to update SLURM token: " + str(details))
