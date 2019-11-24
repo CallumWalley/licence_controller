@@ -342,7 +342,9 @@ def get_nesi_use():
 
         try:
             for line in scontrol_string_list:
-                log.debug(line+"\n")
+                log.debug(line)
+                if len(line)<6:
+                    continue
                 line_delimited=line.split('|')
                 licences_per_user=line_delimited[6].split(',')
                 # User may have multiple licences. Proccess for each.
