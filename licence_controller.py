@@ -507,7 +507,7 @@ def validate():
                 raise Exception("Token not created. Missing 'software_name'")
 
             sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " set Count=" + str(correct_count)
-            ex_slurm_command(sub_input,)
+            ex_slurm_command(sub_input)
 
         def __update_token_share(cluster):
 
