@@ -277,13 +277,10 @@ def apply_soak():
     log.debug("Contructing reservation strings")
     log.debug(json.dumps(res_update_strings))
     for cluster, soak in res_update_strings.items():
-        print(cluster not in settings["clusters"])
-        print(not settings["clusters"][cluster])
 
-        if cluster not in settings["clusters"] or not settings["clusters"][cluster]:
+        if cluster not in settings["clusters"] or (not settings["clusters"][cluster]["enabled"]):
             log.warning("Skipping licence soak on " + cluster)
             continue
-        print(cluster)
         try:
 
             _update_res(cluster, soak)
