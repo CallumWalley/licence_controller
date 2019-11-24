@@ -24,7 +24,8 @@ poll_methods={
     "ansysli_util":{
         "shell_command":"export ANSYSLMD_LICENSE_FILE=$(head -n 1 %(licence_file_path)s | sed -n -e 's/.*=//p');linx64/ansysli_util -liusage",
         "licence_pattern":re.compile(r"(?P<user>[A-Za-z0-9]*)@(?P<host>\S*)\s*(?P<date>[\d\/]*?) (?P<time>[\d\:]*)\s*(?P<feature>[\S^\d]*)[^\d]*(?P<count>\d*)\s*(?P<misc>\S*)",flags=re.M), 
-        "server_pattern":""
+        "server_pattern":"",
+        "details_pattern":re.compile(r"SERVER=(?P<server_port>\d*)@(?P<server_address>\S*)")
     },
     "lmutil":{
         "shell_command":"linx64/lmutil lmstat -a -c %(licence_file_path)s",
@@ -455,15 +456,14 @@ def validate():
                         
                 if ll_value["licence_file_path"] != standard_address and ll_value["software_name"] and ll_value["institution"]:
                     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
-
-                # Read lic file contents
-                if ll_value["server_poll_method"]=="lmutil":
-                    try:
-                        with open(ll_value["licence_file_path"]) as file:
-                            sub_out = file.readline().split()
+                try:
+                    with open(ll_value["licence_file_path"]) as file:
+                            sub_out = file.read()
                     except Exception as details:
                         log.error("Failed to check " + ll_key + " licence file contents at " + ll_value["licence_file_path"] + ": " + str(details))
                     else:
+                # Read lic file contents
+                    if ll_value["server_poll_method"]=="lmutil":
                         if len(sub_out)<4:
                             log.error(ll_key + " Licence File is missing details.")
                         else:
@@ -484,6 +484,11 @@ def validate():
                             if ( not ll_value["server_port"] ) and sub_out[3]:
                                 ll_value["server_port"]=sub_out[3]
                                 log.info(ll_key + " server_port set to " + sub_out[3])            
+                    elif ll_value["server_poll_method"]=="ansysli_util"
+                        match_address=poll_methods[ll_value["server_poll_method"]]["details_pattern"]).match(sub_out).groupdict()
+                        print(match_address)
+                        ll_value["server_address"]=match_address["server_address"]
+                        ll_value["server_port"]=match_address["server_port"]
 
             except Exception as details:
                 log.error(ll_key + ' has an invalid file path attached: "' + str(details))
