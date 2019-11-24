@@ -460,32 +460,33 @@ def validate():
                     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
 
                 # Read lic file contents
-                try:
-                    with open(ll_value["licence_file_path"]) as file:
-                        sub_out = file.readline().split()
-                except Exception as details:
-                    log.error("Failed to check " + ll_key + " licence file contents at " + ll_value["licence_file_path"] + ": " + str(details))
-                else:
-                    if len(sub_out)<4:
-                        log.error(ll_key + "Licence File is missing details.")
+                if ll_value["server_poll_method"]="lmutil":
+                    try:
+                        with open(ll_value["licence_file_path"]) as file:
+                            sub_out = file.readline().split()
+                    except Exception as details:
+                        log.error("Failed to check " + ll_key + " licence file contents at " + ll_value["licence_file_path"] + ": " + str(details))
                     else:
-                        if ll_value["server_address"] and ll_value["server_address"]!=sub_out[1]:
-                            log.error(ll_key + " server_address does not match recorded one.")
-                        if ( not ll_value["server_address"] ) and sub_out[1]:
-                            ll_value["server_address"]=sub_out[1]
-                            log.info(ll_key + " server_address set to " + sub_out[1])
+                        if len(sub_out)<4:
+                            log.error(ll_key + " Licence File is missing details.")
+                        else:
+                            if ll_value["server_address"] and ll_value["server_address"]!=sub_out[1]:
+                                log.error(ll_key + " server_address does not match recorded one.")
+                            if ( not ll_value["server_address"] ) and sub_out[1]:
+                                ll_value["server_address"]=sub_out[1]
+                                log.info(ll_key + " server_address set to " + sub_out[1])
 
-                        if ll_value["server_host_id"] and ll_value["server_host_id"]!=sub_out[2]:
-                            log.error(ll_key + " server_host_id does not match recorded one.")
-                        if ( not ll_value["server_host_id"] ) and sub_out[2]:
-                            ll_value["server_host_id"]=sub_out[2]
-                            log.info(ll_key + " server_host_id set to " + sub_out[2])
+                            if ll_value["server_host_id"] and ll_value["server_host_id"]!=sub_out[2]:
+                                log.error(ll_key + " server_host_id does not match recorded one.")
+                            if ( not ll_value["server_host_id"] ) and sub_out[2]:
+                                ll_value["server_host_id"]=sub_out[2]
+                                log.info(ll_key + " server_host_id set to " + sub_out[2])
 
-                        if ll_value["server_port"] and ll_value["server_port"]!=sub_out[3]:
-                            log.error(ll_key + " server_port does not match recorded one.")
-                        if ( not ll_value["server_port"] ) and sub_out[3]:
-                            ll_value["server_port"]=sub_out[3]
-                            log.info(ll_key + " server_port set to " + sub_out[3])            
+                            if ll_value["server_port"] and ll_value["server_port"]!=sub_out[3]:
+                                log.error(ll_key + " server_port does not match recorded one.")
+                            if ( not ll_value["server_port"] ) and sub_out[3]:
+                                ll_value["server_port"]=sub_out[3]
+                                log.info(ll_key + " server_port set to " + sub_out[3])            
 
             except Exception as details:
                 log.error(ll_key + ' has an invalid file path attached: "' + str(details))
