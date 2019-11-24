@@ -459,9 +459,9 @@ def validate():
                 try:
                     with open(ll_value["licence_file_path"]) as file:
                             sub_out = file.read()
-                    except Exception as details:
+                except Exception as details:
                         log.error("Failed to check " + ll_key + " licence file contents at " + ll_value["licence_file_path"] + ": " + str(details))
-                    else:
+                else:
                 # Read lic file contents
                     if ll_value["server_poll_method"]=="lmutil":
                         if len(sub_out)<4:
@@ -484,8 +484,8 @@ def validate():
                             if ( not ll_value["server_port"] ) and sub_out[3]:
                                 ll_value["server_port"]=sub_out[3]
                                 log.info(ll_key + " server_port set to " + sub_out[3])            
-                    elif ll_value["server_poll_method"]=="ansysli_util"
-                        match_address=poll_methods[ll_value["server_poll_method"]]["details_pattern"]).match(sub_out).groupdict()
+                    elif ll_value["server_poll_method"]=="ansysli_util":
+                        match_address=poll_methods[ll_value["server_poll_method"]]["details_pattern"].match(sub_out).groupdict()
                         print(match_address)
                         ll_value["server_address"]=match_address["server_address"]
                         ll_value["server_port"]=match_address["server_port"]
