@@ -507,7 +507,7 @@ def validate():
                 raise Exception("Token not created. Missing 'software_name'")
 
             sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " set Count=" + str(correct_count)
-            ex_slurm_command(sub_input,"operator")
+            ex_slurm_command(sub_input,)
 
         def __update_token_share(cluster):
 
@@ -521,7 +521,7 @@ def validate():
             if not (slurm_permissions=="operator" or  slurm_permissions=="administrator"):
                 raise Exception("User does not have appropriate SLURM permissions to run '" + sub_input + "'")
 
-            ex_slurm_command(sub_input,"operator")
+            ex_slurm_command(sub_input)
 
         #Try to create  a token if missing.
         def __create_token(cluster):
