@@ -140,7 +140,6 @@ def poll():
                     else:
                         group_dic["host"]=match_cluster.group(0)
 
-                    print(group_dic)
                     tracked_on_nesi=False
                     for token in ll_value["tokens"]:
                         # If tracked feature. Count
@@ -569,8 +568,6 @@ def validate():
                     else:
                         log.info("SLURM token successfully added.")
 
-                    continue
-
                 actual_count=int(active_token_dict[key][3])
                 actual_share=int(active_token_dict[key][7])
                 cluster=active_token_dict[key][6]
@@ -613,7 +610,6 @@ def validate():
                     ll_value["server_status"]="ZERO_TOKEN"
 
                     log.error(key + " has 0 tokens in slurm db. Disabling.")
-                    continue
 
                     # else:
                     #     If total on licence server does not match total slurm tokens, update slurm tokens.
