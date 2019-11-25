@@ -456,12 +456,11 @@ def validate():
                 # if ll_value["licence_file_path"] != standard_address and ll_value["software_name"] and ll_value["institution"]:
                 #     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
                 # Read lic file contents
-                try:
-                    with open(ll_value["licence_file_path"]) as file:
+                with open(ll_value["licence_file_path"]) as file:
                             sub_out = file.read()
-                except Exception as details:
-                        log.error("Failed to check " + ll_key + " licence file contents at " + ll_value["licence_file_path"] + ": " + str(details))
-                else:
+                #raise Exception:
+                #        log.error("Failed to check " + ll_key + " licence file contents at " + ll_value["licence_file_path"] + ": " + str(details))
+                #else:
                 
                     match_address=poll_methods[ll_value["server_poll_method"]]["details_pattern"].match(sub_out).groupdict()
                     ll_value["server_address"]=match_address["server_address"]
@@ -469,7 +468,7 @@ def validate():
                     ll_value["server_host_id"]=match_address["server_host_id"]
 
             except Exception as details:
-                log.error(ll_key + ' has an invalid file path attached: "' + str(details))
+                log.error("'" + ll_key + " has an invalid file path attached: " + str(details))
         else:
             ll_value["licence_file_path"]=standard_address
             log.warning(ll_key + " licence path set to " + standard_address)
