@@ -580,7 +580,7 @@ def validate():
                     if fix_slurm_share:
                         try:
                             for cluster in ll_value["clusters"]:
-                                if cluster not in settings["clusters"] or (not settings["clusters"][cluster]["enabled"]):
+                                if cluster not in settings["clusters"] or "enabled" not in settings["clusters"][cluster] or not settings["clusters"][cluster]["enabled"]:
                                     continue
                                 __update_token_share(cluster)
                         except Exception as details:
