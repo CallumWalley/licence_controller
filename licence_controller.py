@@ -29,7 +29,7 @@ poll_methods={
     },
     "lmutil":{
         "shell_command":"linx64/lmutil lmstat -a -c %(licence_file_path)s",
-        "licence_pattern":re.compile(r"^.*\"(?P<feature>\S+)|\".|\n*^\s*(?P<user>\S*)\s*(?P<host>\S*).*\s(?P<date>\d+\/\d+)\s(?P<time>[\d\:]+).*$",flags=re.M),
+        "licence_pattern":re.compile(r"^.*\"(?P<feature>\S+)\".|\n*^\s*(?P<user>\S*)\s*(?P<host>\S*).*\s(?P<date>\d+\/\d+)\s(?P<time>[\d\:]+).*$",flags=re.M),
         "server_pattern":"",
         "details_pattern":re.compile(r"SERVER (?P<server_address>\S*) (?P<server_>\d*) (?P<server_port>\d*)")
     },
