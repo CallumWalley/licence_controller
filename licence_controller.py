@@ -135,6 +135,7 @@ def poll():
                     else:
                         group_dic["host"]=match_cluster.group(0)
 
+                    print(group_dic)
                     tracked_on_nesi=False
                     for token in ll_value["tokens"]:
                         # If tracked feature. Count
