@@ -18,6 +18,11 @@ from common import log
 # licence_pattern=<pattern applied to extract indiviudal licence users>
 # server_pattern=<pattern applied to get global server properties>
 
+
+# 'enabled' = If 'false' licence server will not be checked, reservation will not be updated. Toggled off if licence is lacking required property.
+# 'active' = If false 'soak' will be set to 'total'. toggled off if licence server cannnot be reached during runtime.
+
+
 # Identifies whether NeSI host.
 cluster_pattern=re.compile(r".*mahuika.*|.*maui.*|.*lander.*|.*nesi.*|wbn\d{3}|wcl\d{3}|vgpuwbg\d{3}|wbl\d{3}|wbh\d{3}|nid00\d{3}|wsn\d{3}|vgpuwsg\d{3}", flags=re.I)
 poll_methods={
@@ -61,7 +66,6 @@ def ex_slurm_command(sub_input, level="administrator"):
         raise Exception("User does not have appropriate SLURM permissions to run this command.")
 
 
-
 def init_polling_object():
     # Some Servers have multiple features being tracked.
     # Consolidate licence servers to avoid making multiple calls.
@@ -72,7 +76,8 @@ def init_polling_object():
     feature_count=0
 
     for key, ll_value in licence_list.items():
-
+        if not ll_value['enabled']:
+            continue
         if ll_value["server_address"] not in poll_list:
             poll_list[ll_value["server_address"]]={"licence_file_path":ll_value["licence_file_path"], "server_poll_method":ll_value["server_poll_method"], "tokens":[]}
             server_count+=1
@@ -195,11 +200,11 @@ def poll():
             #     log.info("Licence Server at '" + key + "' " + server_status)
             except Exception as details:
                 log.error("Failed to fetch " + key + " " + str(details))
-                #log.info("Fully soaking " + key)
-                #ll_value["token_soak"] = ll_value["real_total"]
                 for token in ll_value["tokens"]:
                     token["server_status"]="FAIL"
-                log.info("\rLicence Server at '" + key + "' FAIL")
+                    ll_value["active"]=False
+                    log.error("Fully soaking '" + ll_value["token_name"] + "'!!")   
+                
         except Exception as details:
             log.error("Failed " + key + " " + str(details))            
 
@@ -224,6 +229,7 @@ def do_maths():
 
         if not value['active']:
             value["token_soak"]=value["real_total"]
+            log.warning("Fully soaking " + value)
         else:
             value["token_soak"] = int(min(
                 max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
@@ -262,16 +268,16 @@ def apply_soak():
 
     res_update_strings={}
     for ll_key, ll_value in licence_list.items():
+        if not ll_value['enabled']:
+            continue
 
-        if (ll_value["enabled"] and ll_value["active"]):
+        for cluster in ll_value["clusters"]:
 
-            for cluster in ll_value["clusters"]:
+            if cluster not in res_update_strings:
 
-                if cluster not in res_update_strings:
-
-                    res_update_strings[cluster] =  " licenses="
-                
-                res_update_strings[cluster] += ll_key + ":" + str(ll_value["token_soak"]) + ","    
+                res_update_strings[cluster] =  " licenses="
+            
+            res_update_strings[cluster] += ll_key + ":" + str(ll_value["token_soak"]) + ","    
 
     log.debug("Contructing reservation strings")
     log.debug(json.dumps(res_update_strings))
@@ -303,7 +309,7 @@ def print_panel():
     log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
     
     for value in licence_list.values():
-        if value["active"]:
+        if value["enabled"]:
             log.info("║" + str(value["licence_name"]).center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["server_status"]).center(13) + "║" + str(value["real_total"]).center(13) + "║"  + str(value["real_usage_all"]).center(13) + "║"  + str(value["hourly_averages"][hour_index]).center(13) + "║" + str(value["real_usage_nesi"]).center(13) + "║" + str(value["token_usage"]).center(13) + "║" + str(value["token_soak"]).center(13) + "║" )
 
         
@@ -366,6 +372,7 @@ def get_nesi_use():
                         restart()
         except Exception as e:
             print(e)
+
 def restart():
     """Restarts licence controller"""
     log.info("Restarting licence controller...")
@@ -375,6 +382,7 @@ def restart():
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 def validate():
+    
     """Checks for inconinosistancies"""
 
     if os.environ.get("VALIDATE","").lower()=="false":
@@ -467,9 +475,10 @@ def validate():
                 ll_value["server_port"]=match_address["server_port"]
                 if "server_host_id" in match_address:
                     ll_value["server_host_id"]=match_address["server_host_id"]
-
+                
             except Exception as details:
                 log.error("'" + ll_key + " has an invalid file path attached: " + str(details))
+                ll_value["enabled"]=False
         else:
             ll_value["licence_file_path"]=standard_address
             log.warning(ll_key + " licence path set to " + standard_address)
@@ -554,11 +563,8 @@ def validate():
                         for cluster in settings["clusters"]:
                             __create_token(cluster)
                     except Exception as details:
-                        log.info("Disabling licence " + key + ".")
-
-                        log.info("Disabling licence " + key + ".")
-
                         ll_value["enabled"]=False
+                        log.info("Disabling licence " + key + ".")
                         ll_value["server_status"]="NULL_TOKEN"                    
                     else:
                         log.info("SLURM token successfully added.")
@@ -662,10 +668,13 @@ def validate():
             licence_list[licence] = {}
         
     for ll_key, ll_value in licence_list.items():
+        # Unless specified 'active' and 'enabled' should always start as true.
+        ll_value["active"]=True
+        ll_value["enabled"]=True
         # Add missing values   
         for key in settings["default"].keys():
             if key not in ll_value:
-                    ll_value[key] = settings["default"][key]
+                ll_value[key] = settings["default"][key]
         # Remove extra values  
         for key in ll_value.keys():
             if key not in settings["default"]:
