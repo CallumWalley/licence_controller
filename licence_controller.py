@@ -627,7 +627,7 @@ def validate():
 
 
                 if active_token_dict[ll_key]["share_total"]<95:
-                    log.error('Slurm share only adds up to ' + active_token_dict[ll_key]["share_total"] + '??')
+                    log.error('Slurm share only adds up to ' + str(active_token_dict[ll_key]["share_total"]) + '??')
                     # else:
                     #     If total on licence server does not match total slurm tokens, update slurm tokens.
                     #     if ll_value["real_total"] != int(active_token_dict[key][3])/2 and ll_value["real_total"]!=0:
