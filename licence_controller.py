@@ -65,7 +65,6 @@ def ex_slurm_command(sub_input, level="administrator"):
 
         raise Exception("User does not have appropriate SLURM permissions to run this command.")
 
-
 def init_polling_object():
     # Some Servers have multiple features being tracked.
     # Consolidate licence servers to avoid making multiple calls.
@@ -246,16 +245,16 @@ def do_maths():
 
 def apply_soak():
 
-    def _update_res(cluster, soak_count):
+    def _update_res(cluster, soak):
         log.info("Attempting to update " + cluster + " reservation.")
 
-        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + " " + soak_count
+        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + " " + soak
         ex_slurm_command(sub_input,"operator")
 
-    def _create_res(cluster, soak_count):
+    def _create_res(cluster, soak):
         log.info("Attempting to update " + cluster + " reservation.")
 
-        sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=now Duration=infinite Users=root Flags=LICENSE_ONLY " + soak_count
+        sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=now Duration=infinite Users=root Flags=LICENSE_ONLY " + soak
         ex_slurm_command(sub_input)
 
     if os.environ.get("SOAK","").lower() == "false":
@@ -284,6 +283,9 @@ def apply_soak():
     for cluster, soak in res_update_strings.items():
         if cluster not in settings["clusters"].keys() or "enabled" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["enabled"]:
             log.warning("Skipping licence soak on " + cluster)
+            continue
+        if last_update[cluster]==soak:
+            log.info("skipping soak. No change.")
             continue
         try:
             _update_res(cluster, soak)
@@ -627,7 +629,7 @@ def validate():
 
 
                 if active_token_dict[ll_key]["share_total"]<95:
-                    log.error('Slurm share only adds up to ' + str(active_token_dict[ll_key]["share_total"]) + '??')
+                    log.error('Slurm share only adds up to ' + str(active_token_dict[ll_key]["share_total"]) + '?? (This could be due to a cluster being disabled)')
                     # else:
                     #     If total on licence server does not match total slurm tokens, update slurm tokens.
                     #     if ll_value["real_total"] != int(active_token_dict[key][3])/2 and ll_value["real_total"]!=0:
@@ -746,6 +748,11 @@ module_list = c.readmake_json(settings["path_modulelist"])
 
 log.info("Starting...")
 slurm_permissions=get_slurm_permssions()
+
+# An error will be thrown if reservation is updated without change.
+last_update={}
+for cluster in settings["clusters"].keys():
+    last_update[cluster]=""
 
 #Settings need to be fixed
 fix_slurm_share=True
