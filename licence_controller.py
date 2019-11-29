@@ -532,13 +532,17 @@ def validate():
 
             # Format output data into dictionary 
             for lic_string in string_data.split("\n"):
-
-                log.debug(lic_string)
                 str_arr=lic_string.split("|")
-                active_token_dict[str_arr[0] + "@" + str_arr[1]]=str_arr
 
-            for key, ll_value in licence_list.items():
+                if str_arr[0] + "@" + str_arr[1] not in active_token_dict.keys():
+                    active_token_dict[str_arr[0] + "@" + str_arr[1]]={'token_name':str_arr[0], 'server_name':str_arr[1],'count':int(str_arr[3]), 'share_total':int(str_arr[4]), 'clusters':{}}
+                
+                active_token_dict[str_arr[0] + "@" + str_arr[1]]['clusters'][str_arr[6]]=int(str_arr[7])
+                log.debug(lic_string)
 
+            #print(json.dumps(active_token_dict))
+
+            for ll_key, ll_value in licence_list.items():
 
                 # SLURM requires that each cluster is given a fraction of the full licence pool. 
                 # In order to allow ALL clusters full access to the pool the total number of licence is set at <# clusters> * actual licence count.
@@ -549,68 +553,81 @@ def validate():
                 number_clusters=len(ll_value["clusters"])
                 
                 if number_clusters < 1 :
-                    log.error(key + " not active on any clusters?")
+                    log.error(ll_key + " not active on any clusters?")
+                    ll_value["enabled"]=False
+                    log.info("Disabling licence " + ll_key + ".")
+                    ll_value["server_status"]="NO_CLUSTER"
                     continue
 
                 correct_share=int(100/number_clusters)
                 correct_count=ll_value["real_total"] *  number_clusters
-                log.info("Licence '" + key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(ll_value["clusters"])) + " ).")
+                log.info("Licence '" + ll_key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(ll_value["clusters"])) + " ).")
 
-                if key not in active_token_dict.keys():
-                    log.error(key + " not in SACCT database. Attempting to add.")
+                if ll_key not in active_token_dict.keys():
+                    log.error(ll_key + " not in SACCT database. Attempting to add.")
                     try:
-                        for cluster in settings["clusters"]:
+                        for cluster in ll_value["clusters"]:
                             __create_token(cluster)
                     except Exception as details:
+                        log.error("Failed to add SLURM licence token: " + str(details))
                         ll_value["enabled"]=False
-                        log.info("Disabling licence " + key + ".")
-                        ll_value["server_status"]="NULL_TOKEN"                    
+                        log.info("Disabling licence " + ll_key + ".")
+                        ll_value["server_status"]="NULL_TOKEN"        
+                        continue       
                     else:
                         log.info("SLURM token successfully added.")
+                        restart()
 
-                actual_count=int(active_token_dict[key][3])
-                actual_share=int(active_token_dict[key][7])
-                cluster=active_token_dict[key][6]
-
-                if correct_share != actual_share:
-                    log.error(key + " has cluster share incorrectly set in SACCT database ( '" + str(actual_share) +  "' should be '" + str(correct_share) + "'). Attempting to fix.")
-                    if fix_slurm_share:
-                        try:
-                            for cluster in ll_value["clusters"]:
-                                if cluster not in settings["clusters"] or "enabled" not in settings["clusters"][cluster] or not settings["clusters"][cluster]["enabled"]:
-                                    continue
+                for cluster, share in active_token_dict[ll_key]["clusters"].items():
+                    if correct_share != share:
+                        log.error(ll_key + " has cluster share incorrectly set in SACCT database on " + cluster + " ( '" + str(share) +  "' should be '" + str(correct_share) + "'). Attempting to fix.")
+                        if fix_slurm_share:
+                            try:
                                 __update_token_share(cluster)
-                        except Exception as details:
-                            log.error("Failed to update SLURM token: " + str(details))
-                            log.info("Disabling licence " + key + ".")
+                                # for cluster in ll_value["clusters"]:
+                                #     if cluster not in settings["clusters"] or "enabled" not in settings["clusters"][cluster] or not settings["clusters"][cluster]["enabled"]:
+                                #         continue
+                                    
+                            except Exception as details:
+                                log.error("Failed to update SLURM token: " + str(details))
+                                log.info("Disabling licence " + ll_key + ".")
 
-                            ll_value["enabled"]=False
-                            ll_value["server_status"]="SELFISH_TOKEN"
-                        else:
-                            log.info("SLURM token successfully updated.")
+                                ll_value["enabled"]=False
+                                ll_value["server_status"]="SELFISH_TOKEN"
+                                continue
+                            else:
+                                log.info("SLURM token successfully updated.")
+                                restart()
                     
 
-                if correct_count != actual_count:
+                if correct_count != active_token_dict[ll_key]["count"]:
                 
-                    log.error(key + " has count incorrectly set in SACCT database. Attempting to fix.")
+                    log.error(ll_key + " has count incorrectly set in SACCT database. Attempting to fix.")
                     if fix_slurm_count:
                         try:
                             __update_token_count()
                         except Exception as details:
                             log.error("Failed to update SLURM token: " + str(details))
-                            log.info("Disabling licence " + key + ".")
+                            log.info("Disabling licence " + ll_key + ".")
 
                             ll_value["enabled"]=False
                             ll_value["server_status"]="WRONG_TOKEN"
+                            continue
                         else:
                             log.info("SLURM token successfully updated.")
+                            restart()
+
                 
-                if actual_count==0:
+                if active_token_dict[ll_key]["count"]==0:
                     ll_value["enabled"]=False
                     ll_value["server_status"]="ZERO_TOKEN"
 
-                    log.error(key + " has 0 tokens in slurm db. Disabling.")
+                    log.error(ll_key + " has 0 tokens in slurm db. Disabling.")
+                    continue
 
+
+                if active_token_dict[ll_key]["share_total"]<95:
+                    log.error('Slurm share only adds up to ' + active_token_dict[ll_key]["share_total"] + '??')
                     # else:
                     #     If total on licence server does not match total slurm tokens, update slurm tokens.
                     #     if ll_value["real_total"] != int(active_token_dict[key][3])/2 and ll_value["real_total"]!=0:
