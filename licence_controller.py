@@ -108,6 +108,7 @@ def poll():
                 sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
                 log.debug(key + " OK")
                 features=poll_methods[ll_value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
+                print(json.dumps(features))
                 # Create object from output.
                 
                 last_lic={}
@@ -159,7 +160,7 @@ def poll():
                         token["server_status"]="OK"    
                                             
                     if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
-                        untracked_warning+= "\n    " + group_dic["feature"] + " - '" + group_dic["host"] + "'"                
+                        untracked_warning+= "\n    "  group_dic["host"] + " - '" + group_dic["feature"] + "'    '" + key + "'"                
                 
                     last_lic=group_dic
              
@@ -170,7 +171,7 @@ def poll():
                     ll_value["active"]=False
                     log.error("Fully soaking '" + ll_value["token_name"] + "'!!")   
             if untracked_warning:
-                log.warning("In-use untracked features on '" + key + "':" + untracked_warning)
+                log.warning("Untracked features in use: " + untracked_warning)
     
         except Exception as details:
             log.error("Failed " + key + " " + str(details))            
@@ -601,7 +602,7 @@ def validate():
 
 
                 if active_token_dict[ll_key]["share_total"]<95:
-                    log.warning("'" + ll_key + "' Slurm share only adds up to " + str(active_token_dict[ll_key]["share_total"]) + '?? (This could be due to a cluster being disabled)')
+                    log.warning("'" + ll_key + "' SLURM share only adds up to " + str(active_token_dict[ll_key]["share_total"]) + '?? (This could be due to a cluster being disabled)')
                     # else:
                     #     If total on licence server does not match total slurm tokens, update slurm tokens.
                     #     if ll_value["real_total"] != int(active_token_dict[key][3])/2 and ll_value["real_total"]!=0:
