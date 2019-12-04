@@ -160,7 +160,7 @@ def poll():
                         token["server_status"]="OK"    
                                             
                     if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
-                        untracked_warning+= "\n    "  group_dic["host"] + " - '" + group_dic["feature"] + "'    '" + key + "'"                
+                        untracked_warning+= "\n    " + group_dic["host"] + " - '" + group_dic["feature"] + "'    '" + key + "'"                
                 
                     last_lic=group_dic
              
