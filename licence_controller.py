@@ -36,7 +36,7 @@ poll_methods={
         "shell_command":"linx64/lmutil lmstat -a -c %(licence_file_path)s",
         "licence_pattern":re.compile(r"^.*\"(?P<feature>\S+)\".|\n*^\s*(?P<user>\S*)\s*(?P<host>\S*).*\s(?P<date>\d+\/\d+)\s(?P<time>[\d\:]+).*$",flags=re.M),
         "server_pattern":"",
-        "details_pattern":re.compile(r"SERVER (?P<server_address>\S*) (?P<server_>\d*) (?P<server_port>\d*)")
+        "details_pattern":re.compile(r"SERVER\s+(?P<server_address>\S*)\s+(?P<server_>\d*|ANY)\s(?P<server_port>[\d|,]*)")
     },
     "null":{
         "shell_command":"",
@@ -113,6 +113,7 @@ def poll():
                 last_lic={}
                 
                 for licence in features:
+                    untracked_warning="" # Message about untracked features.
                     group_dic=licence.groupdict()
 
                     # Continue if partial match
@@ -158,51 +159,19 @@ def poll():
                         token["server_status"]="OK"    
                                             
                     if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
-                        log.warning("Untracked feature '" + group_dic["feature"] + "' of licence '" + key + "' in use on '" + group_dic["host"] + "'")
+                        untracked_warning+= "\n" + group_dic["feature"] + " in use on '" + group_dic["host"] + "'"                
                 
                     last_lic=group_dic
-                            
-
-
-            
-
-                # if 
-                # cluster_pattern
-                
-            #     feature_match = feature_pattern.match(line)
-            #     licence_match = licence_pattern.match(line)
-            #     server_match = server_pattern.match(line)
-
-            #     if server_match:
-            #         server_status=server_match.group(1)
-
-            #     if feature_match:
-            #         current_feature={"server_status":server_status, "real_total":int(feature_match.groupdict()["total"]), "real_usage_all":int(feature_match.groupdict()["in_use_real"]), "real_usage_nesi":0, "users_nesi":[]}
-            #         features[feature_match.groupdict()["feature_name"]]=current_feature
-            
-            #     if licence_match:
-            #         licence_row_object=licence_match.groupdict()
-
-            #         current_feature["users"].append(licence_row_object)
-
-            #         if cluster_pattern.match(licence_row_object["socket"]):
-            #             current_feature["users_nesi"].append(licence_row_object)
-            #             if licence_row_object["count"]:
-            #                 current_feature["real_usage_nesi"]+=int(licence_row_object["count"])
-            #             else:
-            #                 current_feature["real_usage_nesi"]+=1
-            #     # Assign any tracked features
-            #     for token in ll_value["tokens"]:
-            #         token.update(features[token["licence_feature_name"]])
-                
-            #     log.info("Licence Server at '" + key + "' " + server_status)
+             
             except Exception as details:
                 log.error("Failed to fetch " + key + " " + str(details))
                 for token in ll_value["tokens"]:
                     token["server_status"]="FAIL"
                     ll_value["active"]=False
                     log.error("Fully soaking '" + ll_value["token_name"] + "'!!")   
-                
+            if untracked_warning:
+                log.warning("In-use untracked features on '" + key + "':" + untracked_warning)
+    
         except Exception as details:
             log.error("Failed " + key + " " + str(details))            
 
