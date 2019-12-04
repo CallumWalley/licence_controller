@@ -159,7 +159,7 @@ def poll():
                         token["server_status"]="OK"    
                                             
                     if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
-                        untracked_warning+= "\n" + group_dic["feature"] + " on '" + group_dic["host"] + "'"                
+                        untracked_warning+= "\n    " + group_dic["feature"] + " - '" + group_dic["host"] + "'"                
                 
                     last_lic=group_dic
              
@@ -244,7 +244,8 @@ def apply_soak():
 
                 res_update_strings[cluster] =  " licenses="
             
-            res_update_strings[cluster] += ll_key + ":" + str(ll_value["token_soak"]) + ","    
+            if ll_value["token_soak"]:
+                res_update_strings[cluster] += ll_key + ":" + str(ll_value["token_soak"]) + ","    
 
     log.debug("Contructing reservation strings")
     log.debug(json.dumps(res_update_strings))
@@ -532,7 +533,7 @@ def validate():
 
                 correct_share=int(100/number_clusters)
                 correct_count=ll_value["real_total"] *  number_clusters
-                log.info("Licence '" + ll_key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(ll_value["clusters"])) + " ).")
+                log.debug("Licence '" + ll_key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(ll_value["clusters"])) + " ).")
 
                 if ll_key not in active_token_dict.keys():
                     log.error(ll_key + " not in SACCT database. Attempting to add.")
@@ -576,7 +577,7 @@ def validate():
                     log.error(ll_key + " has count incorrectly set in SACCT database. Attempting to fix.")
                     if fix_slurm_count:
                         try:
-                            __update_token_count()
+                            __update_token_count(cluster)
                         except Exception as details:
                             log.error("Failed to update SLURM token: " + str(details))
                             log.info("Disabling licence " + ll_key + ".")
