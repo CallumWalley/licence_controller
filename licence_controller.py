@@ -535,6 +535,8 @@ def validate():
                 correct_count=ll_value["real_total"] *  number_clusters
                 log.debug("Licence '" + ll_key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(ll_value["clusters"])) + " ).")
 
+                # Currently token being on one cluster but not the other will NOT throw error. Fix!
+
                 if ll_key not in active_token_dict.keys():
                     log.error(ll_key + " not in SACCT database. Attempting to add.")
                     try:
@@ -599,7 +601,7 @@ def validate():
 
 
                 if active_token_dict[ll_key]["share_total"]<95:
-                    log.warning('Slurm share only adds up to ' + str(active_token_dict[ll_key]["share_total"]) + '?? (This could be due to a cluster being disabled)')
+                    log.warning("'" + ll_key + "' Slurm share only adds up to " + str(active_token_dict[ll_key]["share_total"]) + '?? (This could be due to a cluster being disabled)')
                     # else:
                     #     If total on licence server does not match total slurm tokens, update slurm tokens.
                     #     if ll_value["real_total"] != int(active_token_dict[key][3])/2 and ll_value["real_total"]!=0:
@@ -656,6 +658,8 @@ def validate():
         # Unless specified 'active' and 'enabled' should always start as true.
         ll_value["active"]=True
         ll_value["enabled"]=True
+        ll_value["server_status"]="UNKNOWN"
+
         # Add missing values   
         for key in settings["default"].keys():
             if key not in ll_value:
