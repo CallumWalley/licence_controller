@@ -108,7 +108,6 @@ def poll():
                 sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
                 log.debug(key + " OK")
                 features=poll_methods[ll_value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
-                print(json.dumps(features))
                 # Create object from output.
                 
                 last_lic={}
