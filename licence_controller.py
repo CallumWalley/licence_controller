@@ -159,7 +159,7 @@ def poll():
                         token["server_status"]="OK"    
                                             
                     if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
-                        untracked_warning+= "\n" + group_dic["feature"] + " in use on '" + group_dic["host"] + "'"                
+                        untracked_warning+= "\n" + group_dic["feature"] + " on '" + group_dic["host"] + "'"                
                 
                     last_lic=group_dic
              
@@ -598,7 +598,7 @@ def validate():
 
 
                 if active_token_dict[ll_key]["share_total"]<95:
-                    log.error('Slurm share only adds up to ' + str(active_token_dict[ll_key]["share_total"]) + '?? (This could be due to a cluster being disabled)')
+                    log.warning('Slurm share only adds up to ' + str(active_token_dict[ll_key]["share_total"]) + '?? (This could be due to a cluster being disabled)')
                     # else:
                     #     If total on licence server does not match total slurm tokens, update slurm tokens.
                     #     if ll_value["real_total"] != int(active_token_dict[key][3])/2 and ll_value["real_total"]!=0:
