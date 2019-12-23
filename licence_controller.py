@@ -282,13 +282,13 @@ def print_panel():
     hour_index = dt.datetime.now().hour - 1
 
     log.info("╔═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╗")
-    log.info("║   Licence   ║    Server   ║    Status   ║    Total    ║ Average Use ║  Username   ║ In Use All  ║ In Use NeSI ║  Token Use  ║     Soak    ║")
+    log.info("║   Licence   ║    Server   ║    Status   ║    Total    ║ Average Use ║ In Use All  ║  Username   ║ In Use NeSI ║  Token Use  ║     Soak    ║")
     #log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
     
     for value in licence_list.values():
         if value["enabled"]:
             log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-            log.info("║" + fit_2_col(value["licence_name"]) + "║" + fit_2_col(value["server_name"]) + "║" + fit_2_col(value["server_status"]) + "║" + fit_2_col(value["real_total"]) + "║"  + fit_2_col(value["real_usage_all"]) + "║             " + "║"  + fit_2_col(value["hourly_averages"][hour_index]) + "║" + fit_2_col(value["real_usage_nesi"]) + "║" + fit_2_col(value["token_usage"]) + "║" + fit_2_col(value["token_soak"]) + "║" )
+            log.info("║" + fit_2_col(value["licence_name"]) + "║" + fit_2_col(value["server_name"]) + "║" + fit_2_col(value["server_status"]) + "║" + fit_2_col(value["real_total"]) + "║" + fit_2_col(value["hourly_averages"][hour_index]) + "║"  + fit_2_col(value["real_usage_all"]) + "║             " +  "║" + fit_2_col(value["real_usage_nesi"]) + "║" + fit_2_col(value["token_usage"]) + "║" + fit_2_col(value["token_soak"]) + "║" )
             if value["real_usage_nesi"]:
                 #log.info("╠═════════════╩═════════════╩═════════════╩═════════════╩═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
                 #log.info("║                                                                     ║   User/s    ║ In Use NeSI ║  Token Use  ║   Socket/s  ║")
@@ -296,7 +296,7 @@ def print_panel():
 
                 for user, user_value in value["users_nesi"].items():  
      
-                    log.info("║             "*6 + "║" + fit_2_col(user) + "║" + fit_2_col(user_value["count"]) + "║" + fit_2_col(", ".join(user_value["sockets"]),27) + "║")
+                    log.info("║             "*6 + "║" + fit_2_col(user) + "║" + fit_2_col(user_value["count"]) + "║             ║" + fit_2_col(", ".join(user_value["sockets"]),27) + "║")
 
                 #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
 
