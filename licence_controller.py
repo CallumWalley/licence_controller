@@ -283,8 +283,9 @@ def print_panel():
         if value["enabled"]:
             log.info("║" + str(value["licence_name"]).center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["server_status"]).center(13) + "║" + str(value["real_total"]).center(13) + "║"  + str(value["real_usage_all"]).center(13) + "║"  + str(value["hourly_averages"][hour_index]).center(13) + "║" + str(value["real_usage_nesi"]).center(13) + "║" + str(value["token_usage"]).center(13) + "║" + str(value["token_soak"]).center(13) + "║" )
             if value["real_usage_nesi"]:
-                for user, value in value["users_nesi"]:
-                    log.info("                                             ║" + str(user).center(13) + "║" + str(value["count"]).center(13) + "║" + str(value["sockets"]).center(13) + "║" + "║" )
+                for user, user_value in value["users_nesi"]:
+                    print(value["users_nesi"])
+                    log.info("                                             ║" + str(user).center(13) + "║" + str(user_value["count"]).center(13) + "║" + str(user_value["sockets"]).center(13) + "║" + "║" )
 
                 
         
@@ -711,6 +712,7 @@ def get_slurm_permssions():
 def main():
 
     poll()
+
     get_nesi_use()
     
     do_maths()
@@ -718,6 +720,7 @@ def main():
     apply_soak()
 
     print_panel()
+
     c.writemake_json(settings["path_store"], licence_list)
 
     
