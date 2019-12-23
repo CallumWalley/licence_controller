@@ -274,9 +274,10 @@ def apply_soak():
 
 def print_panel():
 
-    def fit_2_col(instr, colsize):
-        trimmedstr = (colstr[:(colsize-2)] + '..') if len(colstr) > (colsize-2) else colstr
-        cen
+    def fit_2_col(inval, colsize=13):
+        trimmedstr = (str(inval)[:(colsize-2)] + '..') if len(colstr) > (colsize-2) else str(inval)
+        censtr = trimmedstr.center(colsize)
+        return censtr
 
     hour_index = dt.datetime.now().hour - 1
 
@@ -286,17 +287,17 @@ def print_panel():
     
     for value in licence_list.values():
         if value["enabled"]:
-            log.info("║" + str(value["licence_name"]).center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["server_status"]).center(13) + "║" + str(value["real_total"]).center(13) + "║"  + str(value["real_usage_all"]).center(13) + "║"  + str(value["hourly_averages"][hour_index]).center(13) + "║" + str(value["real_usage_nesi"]).center(13) + "║" + str(value["token_usage"]).center(13) + "║" + str(value["token_soak"]).center(13) + "║" )
+            log.info("║" + fit_2_col(value["licence_name"]) + "║" + fit_2_col(value["server_name"]) + "║" + fit_2_col(value["server_status"]) + "║" + fit_2_col(value["real_total"]) + "║"  + fit_2_col(value["real_usage_all"]) + "║"  + fit_2_col(value["hourly_averages"][hour_index]) + "║" + fit_2_col(value["real_usage_nesi"]) + "║" + fit_2_col(value["token_usage"]) + "║" + fit_2_col(value["token_soak"]) + "║" )
             if value["real_usage_nesi"]:
-                log.info("╠═════════════╩═════════════╩═════════════╩═════════════╩═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-                log.info("║                                                                     ║   User/s    ║ In Use NeSI ║  Token Use  ║   Socket/s  ║")
-                log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+                #log.info("╠═════════════╩═════════════╩═════════════╩═════════════╩═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+                #log.info("║                                                                     ║   User/s    ║ In Use NeSI ║  Token Use  ║   Socket/s  ║")
+                #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
 
                 for user, user_value in value["users_nesi"].items():  
      
-                    log.info(""*72 + "║" + str(user).center(13) + "║" + str(user_value["count"]).center(13) + "║" + str(", ".join(user_value["sockets"]))[:50].center(26) + "║")
+                    log.info(" "*72 + "║" + fit_2_col(user) + "║" + fit_2_col(user_value["count"]) + "║" + fit_2_col(", ".join(user_value["sockets"])) + "║")
 
-                log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+                #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
 
         
     log.info("╚═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╝")
