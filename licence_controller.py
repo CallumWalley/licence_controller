@@ -273,6 +273,11 @@ def apply_soak():
             log.info( cluster + " reservation updated successfully!")
 
 def print_panel():
+
+    def fit_2_col(instr, colsize):
+        trimmedstr = (colstr[:(colsize-2)] + '..') if len(colstr) > (colsize-2) else colstr
+        cen
+
     hour_index = dt.datetime.now().hour - 1
 
     log.info("╔═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╗")
@@ -288,9 +293,8 @@ def print_panel():
                 log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
 
                 for user, user_value in value["users_nesi"].items():  
-                    print(value["users_nesi"])
      
-                    log.info(""*72 + "║" + str(user).center(13) + "║" + str(user_value["count"]).center(13) + "║" + str(", ".join(user_value["sockets"]))[:50].center(26) + "║" + "║" )
+                    log.info(""*72 + "║" + str(user).center(13) + "║" + str(user_value["count"]).center(13) + "║" + str(", ".join(user_value["sockets"]))[:50].center(26) + "║")
 
                 log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
 
