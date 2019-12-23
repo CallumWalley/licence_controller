@@ -283,12 +283,17 @@ def print_panel():
         if value["enabled"]:
             log.info("║" + str(value["licence_name"]).center(13) + "║" + str(value["server_name"]).center(13) + "║" + str(value["server_status"]).center(13) + "║" + str(value["real_total"]).center(13) + "║"  + str(value["real_usage_all"]).center(13) + "║"  + str(value["hourly_averages"][hour_index]).center(13) + "║" + str(value["real_usage_nesi"]).center(13) + "║" + str(value["token_usage"]).center(13) + "║" + str(value["token_soak"]).center(13) + "║" )
             if value["real_usage_nesi"]:
+                log.info("╠═════════════╩═════════════╩═════════════╩═════════════╩═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+                log.info("║                                                                     ║   User/s    ║ In Use NeSI ║  Token Use  ║   Socket/s  ║")
+                log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+
                 for user, user_value in value["users_nesi"].items():  
                     print(value["users_nesi"])
      
-                    log.info("                                             ║" + str(user).center(13) + "║" + str(user_value["count"]).center(13) + "║" + str(", ".join(user_value["sockets"])).center(26) + "║" + "║" )
+                    log.info(""*72 + "║" + str(user).center(13) + "║" + str(user_value["count"]).center(13) + "║" + str(", ".join(user_value["sockets"]))[:50].center(26) + "║" + "║" )
 
-                
+                log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+
         
     log.info("╚═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╝")
 
