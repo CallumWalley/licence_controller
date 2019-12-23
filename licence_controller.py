@@ -275,7 +275,7 @@ def apply_soak():
 def print_panel():
 
     def fit_2_col(inval, colsize=13):
-        trimmedstr = (str(inval)[:(colsize-2)] + '..') if len(colstr) > (colsize-2) else str(inval)
+        trimmedstr = (str(inval)[:(colsize-2)] + '..') if len(inval) > (colsize-2) else str(inval)
         censtr = trimmedstr.center(colsize)
         return censtr
 
@@ -737,6 +737,10 @@ def main():
     
 settings = c.readmake_json("settings.json")
 module_list = c.readmake_json(settings["path_modulelist"])
+
+# Clear 
+open('run_as_admin.sh', 'w').close()
+
 
 log.info("Starting...")
 slurm_permissions=get_slurm_permssions()
