@@ -285,7 +285,7 @@ def print_panel():
             if value["real_usage_nesi"]:
                 print(value["users_nesi"])
                 for user, user_value in value["users_nesi"]:       
-                    log.info("                                             ║" + str(user).center(13) + "║" + str(user_value["count"]).center(13) + "║" + str(user_value["sockets"]).center(13) + "║" + "║" )
+                    log.info("                                             ║" + str(user).center(13) + "║" + str(user_value["count"]).center(13) + "║" + str(", ".join(user_value["sockets"])).center(26) + "║" + "║" )
 
                 
         
