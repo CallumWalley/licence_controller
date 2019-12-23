@@ -474,8 +474,8 @@ def validate():
     def _tokens(license_list):
         #Try get list of current slurm tokens
         # Try to fix a token if incorrect.
-        def __update_token_count(cluster):
-            log.info("Attempting to modify SLURM token " + key + " for " + cluster)
+        def __update_token_count():
+            log.info("Attempting to modify SLURM token " + key)
 
             if not ll_value["institution"]:         
                 raise Exception("Token not created. Missing 'instituiton'.")               
@@ -484,7 +484,7 @@ def validate():
             if not ll_value["software_name"]:         
                 raise Exception("Token not created. Missing 'software_name'")
 
-            sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " set count=" + str(correct_count) + " where cluster=" + cluster
+            sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " set Count=" + str(correct_count)
             ex_slurm_command(sub_input)
 
         def __update_token_share(cluster):
@@ -596,7 +596,7 @@ def validate():
                     log.error(ll_key + " has count incorrectly set in SACCT database. Attempting to fix.")
                     if fix_slurm_count:
                         try:
-                            __update_token_count(cluster)
+                            __update_token_count()
                         except Exception as details:
                             log.error("Failed to update SLURM token: " + str(details))
                             log.info("Disabling licence " + ll_key + ".")
