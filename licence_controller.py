@@ -296,7 +296,7 @@ def print_panel():
 
                 for user, user_value in value["users_nesi"].items():  
      
-                    log.info(" "*71 + "║" + fit_2_col(user) + "║" + fit_2_col(user_value["count"]) + "║" + fit_2_col(", ".join(user_value["sockets"])) + "║")
+                    log.info("║" + " "*70 + "║" + fit_2_col(user) + "║" + fit_2_col(user_value["count"]) + "║" + fit_2_col(", ".join(user_value["sockets"])) + "║")
 
                 #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
 
