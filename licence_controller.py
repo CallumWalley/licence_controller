@@ -275,7 +275,7 @@ def apply_soak():
 def print_panel():
 
     def fit_2_col(inval, colsize=13):
-        trimmedstr = (str(inval)[:(colsize-2)] + '..') if len(inval) > (colsize-2) else str(inval)
+        trimmedstr = (str(inval)[:(colsize-2)] + '..') if len(str(inval)) > (colsize-2) else str(inval)
         censtr = trimmedstr.center(colsize)
         return censtr
 
