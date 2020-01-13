@@ -246,7 +246,6 @@ def validate():
         else:
             active_token_dict = {}
 
-            #log.info("Tokens being divided between " + str(number_clusters) + " clusters.")
 
             # Format output data into dictionary 
             for lic_string in string_data.split("\n"):
@@ -437,6 +436,7 @@ def validate():
 
 
     _tokens(licence_list)
+
     c.deep_merge(licence_meta, licence_list)
     c.writemake_json(settings["path_store"], licence_list)
 
@@ -445,8 +445,8 @@ def get_slurm_permssions():
         shell_string="sacctmgr show user ${USER} -Pn"
         log.debug(shell_string)
         lmutil_return=subprocess.check_output(shell_string, shell=True).strip().split('|')[-1].lower()    #Removed .decode("utf-8") as threw error.     
-    except:
-        log.error("Failed to fetch user permissions, assuming none.")
+    except Exception as details:
+        log.error("Failed to fetch user permissions, assuming none: " + str(details))
     else: 
         log.info("User SLURM permissions are '" + lmutil_return + "'")
 
