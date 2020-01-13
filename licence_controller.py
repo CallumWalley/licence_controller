@@ -529,7 +529,8 @@ def poll_remotes():
                                             
                     if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
                         untracked_warning+= "\n    " + group_dic["host"] + " - '" + group_dic["feature"] + "'    '" + key + "'"                
-                
+                    if untracked_warning:
+                        log.warning("Untracked features in use: " + untracked_warning)
                     last_lic=group_dic
              
             except Exception as details:
@@ -540,8 +541,7 @@ def poll_remotes():
                     token["server_status"]="FAIL"
                     ll_value["active"]=False
                     log.error("Fully soaking '" + ll_value["token_name"] + "'!!")   
-            if untracked_warning:
-                log.warning("Untracked features in use: " + untracked_warning)
+            
     
         except Exception as details:
             log.error("Failed " + key + " " + str(details))            
