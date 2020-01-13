@@ -529,8 +529,8 @@ def poll_remotes():
                                             
                     if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
                         untracked_warning+= "\n    " + group_dic["host"] + " - '" + group_dic["feature"] + "'    '" + key + "'"                
-                    if untracked_warning:
-                        log.warning("Untracked features in use: " + untracked_warning)
+                    # if untracked_warning:
+                    #     log.warning("Untracked features in use: " + untracked_warning)
                     last_lic=group_dic
              
             except Exception as details:
