@@ -408,7 +408,7 @@ def validate():
 
         # Add missing values   
         for key in settings["default"].keys():
-            if key not in ll_value and key not in licence_meta[ll_key].keys():
+            if key not in ll_value: #and key not in licence_meta[ll_key].keys():
                 ll_value[key] = settings["default"][key]
                 log.warning(str(ll_key) +  "  " + str(key) + " set to default value \"" + str(settings["default"][key]) + "\"")
 
