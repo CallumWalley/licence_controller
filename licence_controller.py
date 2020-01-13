@@ -1,5 +1,5 @@
 # encoding: utf-8
-import math, os, stat, re, json, logging, time, subprocess, sys
+import math, os, stat, re, json, logging, time, subprocess, sys, traceback
 import datetime as dt
 
 import common as c
@@ -46,6 +46,8 @@ poll_methods={
 }
 untracked={}
 
+# squeue -h -M mahuika --format="%u|%C|%t|%r|%S|%N|%W" -L matlab@uow,comsol@uoa_physics,abaqus@uoa_foe,ansys_hpc@uoa_foe,matlab@massey,matlab@uoa,ansys_r@uoa_foe,matlab@uoo,matlab@vuw,comsol@abi_idg,ansys_r@aut_foe,ansys_hpc@aut_foe,matlab@aut,
+
 def ex_slurm_command(sub_input, level="administrator"):
     log.debug("Attempting to run SLURM command '" + sub_input + "'.")
     if (level=="administrator" and slurm_permissions=="administrator") or (level=="operator" and (slurm_permissions=="operator" or slurm_permissions=="administrator")):
@@ -64,6 +66,10 @@ def ex_slurm_command(sub_input, level="administrator"):
         log.error("Writing command to 'run_as_admin.sh'")
 
         raise Exception("User does not have appropriate SLURM permissions to run this command.")
+def strip_non_ascii(string):
+    ''' Returns the string without non ASCII characters'''
+    stripped = (c for c in string if 0 < ord(c) < 127)
+    return ''.join(stripped)
 
 def init_polling_object():
     # Some Servers have multiple features being tracked.
@@ -83,283 +89,6 @@ def init_polling_object():
         feature_count+=1
         poll_list[ll_value["server_address"]]["tokens"].append(ll_value)
     log.info(str(server_count) + " servers being polled for " + str(feature_count) + " licence features.")
-
-def poll():
-    """Checks total of available licences for all objects passed"""
-        
-    log.info("Polling...")
-
-    # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
-    # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
-    # server_pattern=re.compile(r".*license server (..)\s.*")
-
-    for key, ll_value in poll_list.items():
-        try:
-            log.debug("Checking Licence Server at '" + key + "'...")
-            shell_command_string=poll_methods[ll_value["server_poll_method"]]["shell_command"] % ll_value
-            log.debug(shell_command_string)
-
-            # Clear from last loop
-            for feature_ll_value in ll_value["tokens"]:
-                feature_ll_value["real_usage_all"]=0
-                feature_ll_value["real_usage_nesi"]=0
-                feature_ll_value["users_nesi"]={}
-            try:
-                sub_return=subprocess.check_output(shell_command_string, shell=True)    #Removed .decode("utf-8") as threw error.     
-                log.debug(key + " OK")
-                features=poll_methods[ll_value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
-                # Create object from output.
-                
-                last_lic={}
-                
-                for licence in features:
-                    untracked_warning="" # Message about untracked features.
-                    group_dic=licence.groupdict()
-
-                    # Continue if partial match
-                    if group_dic["user"] == None:
-                        last_lic=group_dic
-                        continue
-
-                    # Squash feature header
-                    if group_dic["feature"] == None:
-                        if "feature" in last_lic and last_lic["feature"]!=None:
-                            group_dic["feature"]=last_lic["feature"]
-                        else:
-                            last_lic=group_dic
-                            continue
-
-                    if "count" not in group_dic or group_dic["count"] == None:
-                        group_dic["count"] = 1
-
-                    match_cluster=cluster_pattern.match(group_dic["host"])
-
-                    # If not on nesi, set host to 'remote'
-                    if match_cluster is None:
-                        group_dic["host"]="remote"
-                    else:
-                        group_dic["host"]=match_cluster.group(0)
-
-                    tracked_on_nesi=False
-                    for token in ll_value["tokens"]:
-                        # If tracked feature. Count
-                        if group_dic["feature"].lower().strip() == token["licence_feature_name"].lower():
-                            token["real_usage_all"]+=int(group_dic["count"])
-                            tracked_on_nesi=True
-                            if group_dic["host"]!="remote":
-                                
-                                token["real_usage_nesi"]+=int(group_dic["count"])
-
-                                if group_dic["user"] not in token["users_nesi"]:
-                                    token["users_nesi"][group_dic["user"]]={"count":0, "sockets":[]}
-
-                                token["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
-                                token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"]) 
-
-                        token["server_status"]="OK"    
-                                            
-                    if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
-                        untracked_warning+= "\n    " + group_dic["host"] + " - '" + group_dic["feature"] + "'    '" + key + "'"                
-                
-                    last_lic=group_dic
-             
-            except Exception as details:
-                log.error("Failed to fetch " + key + " " + str(details))
-                for token in ll_value["tokens"]:
-                    token["server_status"]="FAIL"
-                    ll_value["active"]=False
-                    log.error("Fully soaking '" + ll_value["token_name"] + "'!!")   
-            if untracked_warning:
-                log.warning("Untracked features in use: " + untracked_warning)
-    
-        except Exception as details:
-            log.error("Failed " + key + " " + str(details))            
-
-def do_maths():    
-    
-    log.info("Doing maths...")
-    for value in licence_list.values():
-        hour_index = dt.datetime.now().hour - 1
-
-        if not value['enabled']:
-            continue
-
-        # Record to running history
-        value["history"].append(value["real_usage_all"])
-
-        # Pop extra array entries
-        while len(value["history"]) > value["history_points"]:
-            value["history"].pop(0)
-
-        # Find modified in use value
-        interesting = max(value["history"])-value["token_usage"]
-
-        if not value['active']:
-            value["token_soak"]=value["real_total"]
-            log.warning("Fully soaking " + value)
-        else:
-            value["token_soak"] = int(min(
-                max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
-            ))
-
-        # Update average
-        value["hourly_averages"][hour_index] = (
-            round(
-                ((value["real_usage_all"] * settings["point_weight"]) + (value["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
-                2,
-            )
-            if value["hourly_averages"][hour_index]
-            else value["real_usage_all"]
-        )
-
-def apply_soak():
-
-    def _update_res(cluster, soak):
-        log.info("Attempting to update " + cluster + " reservation.")
-
-        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + " " + soak
-        ex_slurm_command(sub_input,"operator")
-
-    def _create_res(cluster, soak):
-        log.info("Attempting to update " + cluster + " reservation.")
-
-        sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=now Duration=infinite Users=root Flags=LICENSE_ONLY " + soak
-        ex_slurm_command(sub_input)
-
-    if os.environ.get("SOAK","").lower() == "false":
-        log.info("Licence Soak skipped due to 'SOAK=FALSE'")
-        return
-
-    log.info("Applying soak...")
-    res_name = "licence_soak"
-
-    res_update_strings={}
-    for ll_key, ll_value in licence_list.items():
-        if not ll_value['enabled']:
-            continue
-
-        for cluster in ll_value["clusters"]:
-
-            if cluster not in res_update_strings:
-
-                res_update_strings[cluster] =  " licenses="
-            
-            if ll_value["token_soak"]:
-                res_update_strings[cluster] += ll_key + ":" + str(ll_value["token_soak"]) + ","    
-
-    log.debug("Contructing reservation strings")
-    log.debug(json.dumps(res_update_strings))
-
-    for cluster, soak in res_update_strings.items():
-        if cluster not in settings["clusters"].keys() or "enabled" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["enabled"]:
-            log.warning("Skipping licence soak on " + cluster)
-            continue
-        if last_update[cluster]==soak:
-            log.info("skipping soak. No change.")
-            continue
-        try:
-            _update_res(cluster, soak)
-
-        except Exception as details:
-            log.error("Reservation update failed: " + str(details))
-            log.info("Attempting to create new reservation.")
-            try: 
-                _create_res(cluster, soak)
-            except Exception as details:
-                log.error("Failed to create reservation: " + str(details))
-            else:
-                log.info("New reservation '" + res_name + "' created successfully.")
-        else:
-            log.info( cluster + " reservation updated successfully!")
-
-def print_panel():
-
-    def fit_2_col(inval, colsize=13):
-        trimmedstr = (str(inval)[:(colsize-2)] + '..') if len(str(inval)) > (colsize-2) else str(inval)
-        censtr = trimmedstr.center(colsize)
-        return censtr
-
-    hour_index = dt.datetime.now().hour - 1
-
-    log.info("╔═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╗")
-    log.info("║   Licence   ║    Server   ║    Status   ║    Total    ║ Average Use ║ In Use All  ║  Username   ║ In Use NeSI ║  Token Use  ║   Sockets   ║     Soak    ║")
-    #log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-    
-    for value in licence_list.values():
-        if value["enabled"]:
-            log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-            log.info("║" + fit_2_col(value["licence_name"]) + "║" + fit_2_col(value["server_name"]) + "║" + fit_2_col(value["server_status"]) + "║" + fit_2_col(value["real_total"]) + "║" + fit_2_col(value["hourly_averages"][hour_index]) + "║"  + fit_2_col(value["real_usage_all"]) + "║             " +  "║" + fit_2_col(value["real_usage_nesi"]) + "║" + fit_2_col(value["token_usage"]) + "║             ║"  + fit_2_col(value["token_soak"]) + "║" )
-            if value["real_usage_nesi"]:
-                #log.info("╠═════════════╩═════════════╩═════════════╩═════════════╩═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-                #log.info("║                                                                     ║   User/s    ║ In Use NeSI ║  Token Use  ║   Socket/s  ║")
-                #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-
-                for user, user_value in value["users_nesi"].items():  
-     
-                    log.info("║             "*6 + "║" + fit_2_col(user) + "║" + fit_2_col(user_value["count"]) + "║             ║" + fit_2_col(", ".join(user_value["sockets"]),27) + "║")
-
-                #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-
-        
-    log.info("╚═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╝")
-
-def get_nesi_use():
-
-    log.info("Checking NeSI tokens...")
-    all_licence_string=""
-
-    for key in licence_list.keys():
-        all_licence_string+=key + ","
-
-    if not all_licence_string:
-        return
-
-    # Search squeue for running or pending jobs
-    cluster="mahuika"
-    sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_string
-    
-    #licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
-    log.debug(sub_input)
-
-    try:
-        scontrol_string=ex_slurm_command(sub_input,"operator")
-    except Exception as details:
-        log.error("Failed to check scontrol licence usage. " + str(details))
-    else:
-        # Set current usage to zero
-        for licence in licence_list.keys():
-            licence_list[licence]["token_usage"]=0
-
-        # Read by line
-        scontrol_string_list=scontrol_string.split('\n')
-        scontrol_string_list.pop(0) # First Line is bleh
-
-        try:
-            for line in scontrol_string_list:
-                log.debug(line)
-                if len(line)<6:
-                    continue
-                line_delimited=line.split('|')
-                licences_per_user=line_delimited[6].split(',')
-                # User may have multiple licences. Proccess for each.
-                for licence_on_user in licences_per_user:
-                    if not licence_on_user:
-                        continue
-                    licence_on_user_count=licence_on_user.split(':')[1]
-                    licence_on_user_name=licence_on_user.split(':')[0]
-
-                    if licence_on_user_name in licence_list.keys():
-                        licence_list[licence_on_user_name]["token_usage"] += int(licence_on_user_count)
-                        # Add user info here
-
-                        # Yea
-                    else:
-                        log.error("Licence " + licence_on_user_name + " does not exist in licence controller.")
-                        log.info("Empty licence " + licence_on_user_name + " added to meta.")
-                        licence_meta[licence_on_user_name]={}
-                        restart()
-        except Exception as e:
-            print(e)
 
 def restart():
     """Restarts licence controller"""
@@ -679,8 +408,10 @@ def validate():
 
         # Add missing values   
         for key in settings["default"].keys():
-            if key not in ll_value:
+            if key not in ll_value and key not in licence_meta[ll_key].keys():
                 ll_value[key] = settings["default"][key]
+                log.warning(str(ll_key) +  "  " + str(key) + " set to default value \"" + str(settings["default"][key]) + "\"")
+
         # Remove extra values  
         for key in ll_value.keys():
             if key not in settings["default"]:
@@ -688,7 +419,7 @@ def validate():
                 ll_value.pop(key)
 
         _clusters(ll_key, ll_value, module_list)
-        _fill(ll_key, ll_value)
+        #_fill(ll_key, ll_value)
         _address(ll_key, ll_value)
 
         # if not ll_value["licence_file_path"]:
@@ -721,9 +452,294 @@ def get_slurm_permssions():
 
         return lmutil_return
 
+def poll_remotes():
+    """Checks total of available licences for all objects passed"""
+        
+    log.info("Polling...")
+
+    # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
+    # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
+    # server_pattern=re.compile(r".*license server (..)\s.*")
+
+    for key, ll_value in poll_list.items():
+        try:
+            log.debug("Checking Licence Server at '" + key + "'...")
+            shell_command_string=poll_methods[ll_value["server_poll_method"]]["shell_command"] % ll_value
+            log.debug(shell_command_string)
+
+            # Clear from last loop
+            for feature_ll_value in ll_value["tokens"]:
+                feature_ll_value["real_usage_all"]=0
+                feature_ll_value["real_usage_nesi"]=0
+                feature_ll_value["users_nesi"]={}
+            try:
+                sub_return=subprocess.check_output(shell_command_string, shell=True).strip().decode("utf-8",  "replace")    #Removed .decode("utf-8") as threw error.     
+                #print(strip_non_ascii(sub_return).decode("utf-8"))
+                log.debug(key + " OK")
+                features=poll_methods[ll_value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
+                # Create object from output.
+                
+                last_lic={}
+                
+                for licence in features:
+                    untracked_warning="" # Message about untracked features.
+                    group_dic=licence.groupdict()
+
+                    # Continue if partial match
+                    if group_dic["user"] == None:
+                        last_lic=group_dic
+                        continue
+
+                    # Squash feature header
+                    if group_dic["feature"] == None:
+                        if "feature" in last_lic and last_lic["feature"]!=None:
+                            group_dic["feature"]=last_lic["feature"]
+                        else:
+                            last_lic=group_dic
+                            continue
+
+                    if "count" not in group_dic or group_dic["count"] == None:
+                        group_dic["count"] = 1
+
+                    match_cluster=cluster_pattern.match(group_dic["host"])
+
+                    # If not on nesi, set host to 'remote'
+                    if match_cluster is None:
+                        group_dic["host"]="remote"
+                    else:
+                        group_dic["host"]=match_cluster.group(0)
+
+                    tracked_on_nesi=False
+                    for token in ll_value["tokens"]:
+                        # If tracked feature. Count
+                        if group_dic["feature"].lower().strip() == token["licence_feature_name"].lower():
+                            token["real_usage_all"]+=int(group_dic["count"])
+                            tracked_on_nesi=True
+                            if group_dic["host"]!="remote":
+                                
+                                token["real_usage_nesi"]+=int(group_dic["count"])
+
+                                if group_dic["user"] not in token["users_nesi"]:
+                                    token["users_nesi"][group_dic["user"]]={"count":0, "tokens":0, "sockets":[]}
+
+                                token["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
+                                token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"]) 
+
+                        token["server_status"]="OK"    
+                                            
+                    if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
+                        untracked_warning+= "\n    " + group_dic["host"] + " - '" + group_dic["feature"] + "'    '" + key + "'"                
+                
+                    last_lic=group_dic
+             
+            except Exception as details:
+                log.error("Failed to fetch " + key + " " + str(details))
+                traceback.print_tb(sys.exc_info()[2])
+
+                for token in ll_value["tokens"]:
+                    token["server_status"]="FAIL"
+                    ll_value["active"]=False
+                    log.error("Fully soaking '" + ll_value["token_name"] + "'!!")   
+            if untracked_warning:
+                log.warning("Untracked features in use: " + untracked_warning)
+    
+        except Exception as details:
+            log.error("Failed " + key + " " + str(details))            
+
+def get_nesi_use():
+
+    log.info("Checking NeSI tokens...")
+    all_licence_string=""
+
+    for key in licence_list.keys():
+        all_licence_string+=key + ","
+
+    if not all_licence_string:
+        return
+
+    # Search squeue for running or pending jobs
+    cluster="mahuika"
+    sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_string
+    
+    #licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
+    log.debug(sub_input)
+
+    try:
+        scontrol_string=ex_slurm_command(sub_input,"operator")
+    except Exception as details:
+        log.error("Failed to check scontrol licence usage. " + str(details))
+    else:
+        # Set current usage to zero
+        for licence in licence_list.keys():
+            licence_list[licence]["token_usage"]=0
+
+        # Read by line
+        scontrol_string_list=scontrol_string.split('\n')
+        scontrol_string_list.pop(0) # First Line is bleh
+
+        try:
+            for line in scontrol_string_list:
+                log.debug(line)
+                if len(line)<6:
+                    continue
+                line_delimited=line.split('|')
+                username=line_delimited[0]
+                licences_per_user=line_delimited[6].split(',')
+                # User may have multiple licences. Proccess for each.
+                for licence_token in licences_per_user:
+                    if not licence_token:
+                        continue
+
+                    licence_token_name=licence_token.split(':')[0]
+                    licence_token_count = licence_token.split(':')[1] if len(licence_token.split(':'))>1 else 1
+
+                    if licence_token_name in licence_list.keys():
+                        licence_list[licence_token_name]["token_usage"] += int(licence_token_count)
+                        
+                        if username not in licence_list[licence_token_name]["users_nesi"]:
+                            licence_list[licence_token_name]["users_nesi"][username]={"count":0, "tokens":0, "sockets":[]}
+
+                        licence_list[licence_token_name]["users_nesi"][username]["tokens"]+=int(licence_token_count)
+                    
+                    else:
+                        log.error("Licence " + licence_token_name + " does not exist in licence controller.")
+                        log.info("Empty licence " + licence_token_name + " added to meta.")
+                        licence_meta[licence_token_name]={}
+                        restart()
+        except Exception as e:
+            print(e)
+
+def do_maths():    
+    
+    log.info("Doing maths...")
+    for value in licence_list.values():
+        hour_index = dt.datetime.now().hour - 1
+
+        if not value['enabled']:
+            continue
+
+        # Record to running history
+        value["history"].append(value["real_usage_all"])
+
+        # Pop extra array entries
+        while len(value["history"]) > value["history_points"]:
+            value["history"].pop(0)
+
+        # Find modified in use value
+        interesting = max(value["history"])-value["token_usage"]
+
+        if not value['active']:
+            value["token_soak"]=value["real_total"]
+            log.warning("Fully soaking " + value)
+        else:
+            value["token_soak"] = int(min(
+                max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
+            ))
+
+        # Update average
+        value["hourly_averages"][hour_index] = (
+            round(
+                ((value["real_usage_all"] * settings["point_weight"]) + (value["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
+                2,
+            )
+            if value["hourly_averages"][hour_index]
+            else value["real_usage_all"]
+        )
+
+def apply_soak():
+
+    def _update_res(cluster, soak):
+        log.info("Attempting to update " + cluster + " reservation.")
+
+        sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + " " + soak
+        ex_slurm_command(sub_input,"operator")
+
+    def _create_res(cluster, soak):
+        log.info("Attempting to update " + cluster + " reservation.")
+
+        sub_input = "scontrol create -M " + cluster + " ReservationName=" + res_name + " StartTime=now Duration=infinite Users=root Flags=LICENSE_ONLY " + soak
+        ex_slurm_command(sub_input)
+
+    if os.environ.get("SOAK","").lower() == "false":
+        log.info("Licence Soak skipped due to 'SOAK=FALSE'")
+        return
+
+    log.info("Applying soak...")
+    res_name = "licence_soak"
+
+    res_update_strings={}
+    for ll_key, ll_value in licence_list.items():
+        if not ll_value['enabled']:
+            continue
+
+        for cluster in ll_value["clusters"]:
+
+            if cluster not in res_update_strings:
+
+                res_update_strings[cluster] =  " licenses="
+            
+            if ll_value["token_soak"]:
+                res_update_strings[cluster] += ll_key + ":" + str(ll_value["token_soak"]) + ","    
+
+    log.debug("Contructing reservation strings")
+    log.debug(json.dumps(res_update_strings))
+
+    for cluster, soak in res_update_strings.items():
+        if cluster not in settings["clusters"].keys() or "enabled" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["enabled"]:
+            log.warning("Skipping licence soak on " + cluster)
+            continue
+        if last_update[cluster]==soak:
+            log.info("skipping soak. No change.")
+            continue
+        try:
+            _update_res(cluster, soak)
+
+        except Exception as details:
+            log.error("Reservation update failed: " + str(details))
+            log.info("Attempting to create new reservation.")
+            try: 
+                _create_res(cluster, soak)
+            except Exception as details:
+                log.error("Failed to create reservation: " + str(details))
+            else:
+                log.info("New reservation '" + res_name + "' created successfully.")
+        else:
+            log.info( cluster + " reservation updated successfully!")
+
+def print_panel():
+
+    def fit_2_col(inval, colsize=13):
+        trimmedstr = (str(inval)[:(colsize-2)] + '..') if len(str(inval)) > (colsize-2) else str(inval)
+        censtr = trimmedstr.center(colsize)
+        return censtr
+
+    hour_index = dt.datetime.now().hour - 1
+
+    log.info("╔═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═══════════════════════════╦══════════════════════════╗")
+    log.info("║   Licence   ║    Server   ║    Status   ║    Total    ║ Average Use ║ In Use All  ║  Username   ║ In Use NeSI ║  Token Use  ║          Sockets          ║           Soak           ║")
+    #log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+    
+    for value in licence_list.values():
+        if value["enabled"]:
+            log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═══════════════════════════╬══════════════════════════╣")
+            log.info("║" + fit_2_col(value["licence_name"]) + "║" + fit_2_col(value["server_name"]) + "║" + fit_2_col(value["server_status"]) + "║" + fit_2_col(value["real_total"]) + "║" + fit_2_col(value["hourly_averages"][hour_index]) + "║"  + fit_2_col(value["real_usage_all"]) + "║             ║" + fit_2_col(value["real_usage_nesi"]) + "║" + fit_2_col(value["token_usage"]) + "║                           ║"  + fit_2_col(value["token_soak"], 26) + "║" )
+            if value["real_usage_nesi"]:
+                #log.info("╠═════════════╩═════════════╩═════════════╩═════════════╩═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+                #log.info("║                                                                     ║   User/s    ║ In Use NeSI ║  Token Use  ║   Socket/s  ║")
+                #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+
+                for user, user_value in value["users_nesi"].items():  
+     
+                    log.info("║             "*6 + "║" + fit_2_col(user) + "║" + fit_2_col(user_value["count"]) + "║" + fit_2_col(user_value["tokens"]) + "║" + fit_2_col(",".join(user_value["sockets"]),54) + "║")
+
+                #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+
+        
+    log.info("╚═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═══════════════════════════╩══════════════════════════╝")
+
 def main():
 
-    poll()
+    poll_remotes()
 
     get_nesi_use()
     
@@ -735,13 +751,12 @@ def main():
 
     c.writemake_json(settings["path_store"], licence_list)
 
-    
+
 settings = c.readmake_json("settings.json")
 module_list = c.readmake_json(settings["path_modulelist"])
 
 # Clear 
 open('run_as_admin.sh', 'w').close()
-
 
 log.info("Starting...")
 slurm_permissions=get_slurm_permssions()
@@ -766,7 +781,9 @@ licence_meta = c.readmake_json(settings["path_meta"])
 licence_list = c.readmake_json(settings["path_store"])
 
 validate()
+
 poll_list={}
+
 init_polling_object()
 
 while 1:
