@@ -444,7 +444,7 @@ def get_slurm_permssions():
     try:
         shell_string="sacctmgr show user ${USER} -Pn"
         log.debug(shell_string)
-        lmutil_return=subprocess.check_output(shell_string, shell=True).strip().split('|')[-1].lower()    #Removed .decode("utf-8") as threw error.     
+        lmutil_return=subprocess.check_output(shell_string, shell=True).decode("utf-8").strip().split('|')[-1].lower()    #Removed .decode("utf-8") as threw error.     
     except Exception as details:
         log.error("Failed to fetch user permissions, assuming none: " + str(details))
     else: 
