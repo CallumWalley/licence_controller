@@ -419,7 +419,7 @@ def validate():
                 ll_value.pop(key)
 
         _clusters(ll_key, ll_value, module_list)
-        #_fill(ll_key, ll_value)
+        _fill(ll_key, ll_value)
         _address(ll_key, ll_value)
 
         # if not ll_value["licence_file_path"]:
