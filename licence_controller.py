@@ -1,5 +1,4 @@
-# encoding: utf-8
-import math, os, stat, re, json, logging, time, subprocess, sys, traceback
+import math, os, stat, re, json, logging, time, subprocess, sys, traceback, curses
 import datetime as dt
 
 import common as c
@@ -8,11 +7,14 @@ from pwd import getpwuid
 from grp import getgrgid
 from common import log
 
+
+# encoding: utf-8
+
 #=== TO DO ===#
 # CHECKUSER = FALSE # Disables user checks. 
 # VALIDATE = FALSE # Disables validation check.
 # SOAK = FALSE # Disables soak.
-# LOGLEVEL = ERROR, WARNING, INFO, DEBUG
+# LOGLEVEL = NONE, ERROR, WARNING, INFO, DEBUG
 
 # cmd_method=<command line argument to get output>
 # licence_pattern=<pattern applied to extract indiviudal licence users>
@@ -82,6 +84,7 @@ def init_polling_object():
 
     for key, ll_value in licence_list.items():
         if not ll_value['enabled']:
+            log.debug(key + "is disabled, not being added to poll object")
             continue
         if ll_value["server_address"] not in poll_list:
             poll_list[ll_value["server_address"]]={"licence_file_path":ll_value["licence_file_path"], "server_poll_method":ll_value["server_poll_method"], "tokens":[]}
@@ -230,8 +233,9 @@ def validate():
         def __create_token(cluster):
             log.info("Attempting to create SLURM token " + key + " for " + cluster)
 
-            if not (ll_value["institution"] and ll_value["real_total"] and ll_value["software_name"]):         
-                raise Exception("Token not created. Missing one or more of 'instituiton', 'software_name', 'real_total'.")               
+            for value in ["licence_name", "server_name"]:
+                if not (ll_value[value]):         
+                    raise Exception("Token not created. Missing '" + value + "'.")         
 
             sub_input="sacctmgr -i add resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " Count=" + str(correct_count) + " Type=License percentallowed=" + str(correct_share) +" where cluster=" + cluster
 
@@ -412,7 +416,7 @@ def validate():
                 log.warning(str(ll_key) +  "  " + str(key) + " set to default value \"" + str(settings["default"][key]) + "\"")
 
         # Remove extra values  
-        for key in ll_value.keys():
+        for key in list(ll_value):
             if key not in settings["default"]:
                 log.warning("Removed defunct key '" + key + "' from something" )
                 ll_value.pop(key)
@@ -452,16 +456,119 @@ def get_slurm_permssions():
 
         return lmutil_return
 
+def get_nesi_use():
+    global last_squeue_poll
+    if looptime < last_squeue_poll + settings["squeue_poll_period"]:
+        return
+
+    log.info("Checking NeSI tokens...")
+    all_licence_string=""
+
+    for key in licence_list.keys():
+        all_licence_string+=key + ","
+
+    if not all_licence_string:
+        return
+
+    # Search squeue for running or pending jobs
+    cluster="mahuika"
+    sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_string
+    
+    #licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
+    log.debug(sub_input)
+    last_squeue_poll=time.time()
+    try:
+        scontrol_string=ex_slurm_command(sub_input,"operator")
+    except Exception as details:
+        log.error("Failed to check scontrol licence usage. " + str(details))
+    else:
+        # Set current usage to zero
+        for licence in licence_list.keys():
+            licence_list[licence]["token_usage"]=0
+
+        # Read by line
+        scontrol_string_list=scontrol_string.split('\n')
+        scontrol_string_list.pop(0) # First Line is bleh
+
+        try:
+            for line in scontrol_string_list:
+                log.debug(line)
+                if len(line)<6:
+                    continue
+                line_delimited=line.split('|')
+                username=line_delimited[0]
+                licences_per_user=line_delimited[6].split(',')
+                # User may have multiple licences. Proccess for each.
+                for licence_token in licences_per_user:
+                    if not licence_token:
+                        continue
+
+                    licence_token_name=licence_token.split(':')[0]
+                    licence_token_count = licence_token.split(':')[1] if len(licence_token.split(':'))>1 else 1
+
+                    if licence_token_name in licence_list.keys():
+                        licence_list[licence_token_name]["token_usage"] += int(licence_token_count)
+                        
+                        if username not in licence_list[licence_token_name]["users_nesi"]:
+                            licence_list[licence_token_name]["users_nesi"][username]={"count":0, "tokens":0, "sockets":[]}
+
+                        licence_list[licence_token_name]["users_nesi"][username]["tokens"]+=int(licence_token_count)
+                    
+                    else:
+                        log.error("Licence " + licence_token_name + " does not exist in licence controller.")
+                        log.info("Empty licence " + licence_token_name + " added to meta.")
+                        licence_meta[licence_token_name]={}
+                        restart()
+        except Exception as e:
+            print(e)
+
+def do_maths(value):
+    
+    log.info("Doing maths...")
+    hour_index = dt.datetime.now().hour - 1
+
+    if not value['enabled']:
+        return
+
+    # Find modified in use value
+    interesting = max(value["history"])-value["token_usage"]
+
+    if not value['active']:
+        value["token_soak"]=value["real_total"]
+        log.warning("Fully soaking " + value)
+    else:
+        value["token_soak"] = int(min(
+            max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
+        ))
+
+    # Update average
+    value["hourly_averages"][hour_index] = (
+        round(
+            ((value["real_usage_all"] * settings["point_weight"]) + (value["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
+            2,
+        )
+        if value["hourly_averages"][hour_index]
+        else value["real_usage_all"]
+    )
+
 def poll_remotes():
     """Checks total of available licences for all objects passed"""
-        
-    log.info("Polling...")
-
+    
     # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
     # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
     # server_pattern=re.compile(r".*license server (..)\s.*")
 
     for key, ll_value in poll_list.items():
+        poll=True
+        for feature_ll_value in ll_value["tokens"]:
+            log.debug(looptime)
+            log.debug(feature_ll_value["last_poll"])     
+            log.debug(feature_ll_value["server_poll_period"])
+            if looptime < feature_ll_value["last_poll"]+feature_ll_value["server_poll_period"]:   
+                poll=False
+
+        if not poll:
+            continue        
         try:
             log.debug("Checking Licence Server at '" + key + "'...")
             shell_command_string=poll_methods[ll_value["server_poll_method"]]["shell_command"] % ll_value
@@ -469,6 +576,12 @@ def poll_remotes():
 
             # Clear from last loop
             for feature_ll_value in ll_value["tokens"]:
+                # Record to running history
+                feature_ll_value["history"].append(feature_ll_value["real_usage_all"])
+                    # Pop extra array entries
+                while len(feature_ll_value["history"]) > feature_ll_value["history_points"]:
+                    feature_ll_value["history"].pop(0)
+
                 feature_ll_value["real_usage_all"]=0
                 feature_ll_value["real_usage_nesi"]=0
                 feature_ll_value["users_nesi"]={}
@@ -542,110 +655,15 @@ def poll_remotes():
                     ll_value["active"]=False
                     log.error("Fully soaking '" + ll_value["token_name"] + "'!!")   
             
-    
         except Exception as details:
-            log.error("Failed " + key + " " + str(details))            
-
-def get_nesi_use():
-
-    log.info("Checking NeSI tokens...")
-    all_licence_string=""
-
-    for key in licence_list.keys():
-        all_licence_string+=key + ","
-
-    if not all_licence_string:
-        return
-
-    # Search squeue for running or pending jobs
-    cluster="mahuika"
-    sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_string
-    
-    #licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
-    log.debug(sub_input)
-
-    try:
-        scontrol_string=ex_slurm_command(sub_input,"operator")
-    except Exception as details:
-        log.error("Failed to check scontrol licence usage. " + str(details))
-    else:
-        # Set current usage to zero
-        for licence in licence_list.keys():
-            licence_list[licence]["token_usage"]=0
-
-        # Read by line
-        scontrol_string_list=scontrol_string.split('\n')
-        scontrol_string_list.pop(0) # First Line is bleh
-
-        try:
-            for line in scontrol_string_list:
-                log.debug(line)
-                if len(line)<6:
-                    continue
-                line_delimited=line.split('|')
-                username=line_delimited[0]
-                licences_per_user=line_delimited[6].split(',')
-                # User may have multiple licences. Proccess for each.
-                for licence_token in licences_per_user:
-                    if not licence_token:
-                        continue
-
-                    licence_token_name=licence_token.split(':')[0]
-                    licence_token_count = licence_token.split(':')[1] if len(licence_token.split(':'))>1 else 1
-
-                    if licence_token_name in licence_list.keys():
-                        licence_list[licence_token_name]["token_usage"] += int(licence_token_count)
-                        
-                        if username not in licence_list[licence_token_name]["users_nesi"]:
-                            licence_list[licence_token_name]["users_nesi"][username]={"count":0, "tokens":0, "sockets":[]}
-
-                        licence_list[licence_token_name]["users_nesi"][username]["tokens"]+=int(licence_token_count)
-                    
-                    else:
-                        log.error("Licence " + licence_token_name + " does not exist in licence controller.")
-                        log.info("Empty licence " + licence_token_name + " added to meta.")
-                        licence_meta[licence_token_name]={}
-                        restart()
-        except Exception as e:
-            print(e)
-
-def do_maths():    
-    
-    log.info("Doing maths...")
-    for value in licence_list.values():
-        hour_index = dt.datetime.now().hour - 1
-
-        if not value['enabled']:
-            continue
-
-        # Record to running history
-        value["history"].append(value["real_usage_all"])
-
-        # Pop extra array entries
-        while len(value["history"]) > value["history_points"]:
-            value["history"].pop(0)
-
-        # Find modified in use value
-        interesting = max(value["history"])-value["token_usage"]
-
-        if not value['active']:
-            value["token_soak"]=value["real_total"]
-            log.warning("Fully soaking " + value)
+            log.error("Failed " + key + " " + str(details))       
         else:
-            value["token_soak"] = int(min(
-                max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
-            ))
-
-        # Update average
-        value["hourly_averages"][hour_index] = (
-            round(
-                ((value["real_usage_all"] * settings["point_weight"]) + (value["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
-                2,
-            )
-            if value["hourly_averages"][hour_index]
-            else value["real_usage_all"]
-        )
-
+            for feature_ll_value in ll_value["tokens"]:
+                feature_ll_value["last_poll"]=time.time()
+                do_maths(feature_ll_value)
+                if feature_ll_value["history"][-1] != feature_ll_value["real_usage_all"]:
+                    apply_soak()
+            
 def apply_soak():
 
     def _update_res(cluster, soak):
@@ -712,45 +730,47 @@ def print_panel():
         trimmedstr = (str(inval)[:(colsize-2)] + '..') if len(str(inval)) > (colsize-2) else str(inval)
         censtr = trimmedstr.center(colsize)
         return censtr
+    
+    dashboard=""
 
     hour_index = dt.datetime.now().hour - 1
 
-    log.info("╔═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═════════════╦═══════════════════════════╦══════════════════════════╗")
-    log.info("║   Licence   ║    Server   ║    Status   ║    Total    ║ Average Use ║ In Use All  ║  Username   ║ In Use NeSI ║  Token Use  ║          Sockets          ║           Soak           ║")
-    #log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+    dashboard+=("O=============v=============v=============v=============v=============v=============v=============v=============v=============v===========================v==========================O\n")
+    dashboard+=("|   Licence   |    Server   |    Status   |    Total    | Average Use | In Use All  |  Username   | In Use NeSI |  Token Use  |          Sockets          |           Soak           |\n")
+    #dashboard+=("|=============+=============+=============+=============+=============+=============+=============+=============+=============|")
     
     for value in licence_list.values():
         if value["enabled"]:
-            log.info("╠═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═════════════╬═══════════════════════════╬══════════════════════════╣")
-            log.info("║" + fit_2_col(value["licence_name"]) + "║" + fit_2_col(value["server_name"]) + "║" + fit_2_col(value["server_status"]) + "║" + fit_2_col(value["real_total"]) + "║" + fit_2_col(value["hourly_averages"][hour_index]) + "║"  + fit_2_col(value["real_usage_all"]) + "║             ║" + fit_2_col(value["real_usage_nesi"]) + "║" + fit_2_col(value["token_usage"]) + "║                           ║"  + fit_2_col(value["token_soak"], 26) + "║" )
+            dashboard+=("|=============+=============+=============+=============+=============+=============+=============+=============+=============+===========================+==========================|\n")
+            dashboard+=("|" + fit_2_col(value["licence_name"]) + "|" + fit_2_col(value["server_name"]) + "|" + fit_2_col(value["server_status"]) + "|" + fit_2_col(value["real_total"]) + "|" + fit_2_col(value["hourly_averages"][hour_index]) + "|"  + fit_2_col(value["real_usage_all"]) + "|             |" + fit_2_col(value["real_usage_nesi"]) + "|" + fit_2_col(value["token_usage"]) + "|                           |"  + fit_2_col(value["token_soak"], 26) + "|\n" )
             if value["real_usage_nesi"]:
-                #log.info("╠═════════════╩═════════════╩═════════════╩═════════════╩═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
-                #log.info("║                                                                     ║   User/s    ║ In Use NeSI ║  Token Use  ║   Socket/s  ║")
-                #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+                #dashboard+=("|=============^=============^=============^=============^=============+=============+=============+=============+=============|")
+                #dashboard+=("|                                                                     |   User/s    | In Use NeSI |  Token Use  |   Socket/s  |")
+                #dashboard+=("|=============v=============v=============v=============v=============+=============+=============+=============+=============|")
 
                 for user, user_value in value["users_nesi"].items():  
      
-                    log.info("║             "*6 + "║" + fit_2_col(user) + "║" + fit_2_col(user_value["count"]) + "║" + fit_2_col(user_value["tokens"]) + "║" + fit_2_col(",".join(user_value["sockets"]),54) + "║")
+                    dashboard+=("|             "*6 + "|" + fit_2_col(user) + "|" + fit_2_col(user_value["count"]) + "|" + fit_2_col(user_value["tokens"]) + "|" + fit_2_col(",".join(user_value["sockets"]),54) + "|\n")
 
-                #log.info("╠═════════════╦═════════════╦═════════════╦═════════════╦═════════════╬═════════════╬═════════════╬═════════════╬═════════════╣")
+                #dashboard+=("|=============v=============v=============v=============v=============+=============+=============+=============+=============|")
 
         
-    log.info("╚═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═════════════╩═══════════════════════════╩══════════════════════════╝")
+    dashboard+=("O=============^=============^=============^=============^=============^=============^=============^=============^=============^===========================^==========================O\n")
+    main_dashboard.refresh()
+    main_dashboard.addstr(1,0,dashboard)
+
 
 def main():
 
     poll_remotes()
 
     get_nesi_use()
-    
-    do_maths()
-     
-    apply_soak()
 
     print_panel()
 
     c.writemake_json(settings["path_store"], licence_list)
 
+main_dashboard = curses.initscr()
 
 settings = c.readmake_json("settings.json")
 module_list = c.readmake_json(settings["path_modulelist"])
@@ -786,6 +806,8 @@ poll_list={}
 
 init_polling_object()
 
+last_squeue_poll=0
+
 while 1:
     looptime = time.time()
     try:
@@ -794,8 +816,8 @@ while 1:
         print(sys.exc_info())
         log.error("Main loop failed: " + str(details))
 
-    log.info("main loop time = " + str(time.time() - looptime))
-    time.sleep(max(settings["poll_period"] - (time.time() - looptime), 0))
+    #log.info("main loop time = " + str(time.time() - looptime))
+    #time.sleep(max(settings["poll_period"] - (time.time() - looptime), 0))
 
     # for key, ll_value in licence_list.items():
     # hour_index = dt.datetime.now().hour - 1
