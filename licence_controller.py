@@ -72,7 +72,6 @@ def strip_non_ascii(string):
     ''' Returns the string without non ASCII characters'''
     stripped = (c for c in string if 0 < ord(c) < 127)
     return ''.join(stripped)
-
 def init_polling_object():
     # Some Servers have multiple features being tracked.
     # Consolidate licence servers to avoid making multiple calls.
@@ -176,10 +175,10 @@ def validate():
                     log.error(ll_key + " file address permissions look weird.")
 
                 if ll_value["licence_file_group"] and group != ll_value["licence_file_group"]:
-                    log.error(ll_value["licence_file_path"] + ' group is "' + group + '", should be "' + ll_value["licence_file_group"] + '".')
+                    log.warning(ll_value["licence_file_path"] + ' group is "' + group + '", should be "' + ll_value["licence_file_group"] + '".')
 
                 if owner != settings["user"]:
-                    log.error(ll_value["licence_file_path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
+                    log.warning(ll_value["licence_file_path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
                         
                 # if ll_value["licence_file_path"] != standard_address and ll_value["software_name"] and ll_value["institution"]:
                 #     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
@@ -461,7 +460,7 @@ def get_nesi_use():
     if looptime < last_squeue_poll + settings["squeue_poll_period"]:
         return
 
-    log.info("Checking NeSI tokens...")
+    log.info("Checking NeSI tokens... (period " + str(settings["squeue_poll_period"]) + "s)")
     all_licence_string=""
 
     for key in licence_list.keys():
@@ -519,9 +518,11 @@ def get_nesi_use():
                         log.info("Empty licence " + licence_token_name + " added to meta.")
                         licence_meta[licence_token_name]={}
                         restart()
+            
         except Exception as e:
             print(e)
 
+    print_panel()
 def do_maths(value):
     
     log.info("Doing maths...")
@@ -553,7 +554,6 @@ def do_maths(value):
 
 def poll_remotes():
     """Checks total of available licences for all objects passed"""
-    
     # feature_pattern=re.compile(r"Users of (?P<feature_name>\w*?):  \(Total of (?P<total>\d*?) licenses issued;  Total of (?P<in_use_real>\d*?) licenses in use\)")
     # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
     # server_pattern=re.compile(r".*license server (..)\s.*")
@@ -561,16 +561,15 @@ def poll_remotes():
     for key, ll_value in poll_list.items():
         poll=True
         for feature_ll_value in ll_value["tokens"]:
-            log.debug(looptime)
-            log.debug(feature_ll_value["last_poll"])     
-            log.debug(feature_ll_value["server_poll_period"])
+            #log.debug("Delta poll: " + str(feature_ll_value["last_poll"]-looptime))     
+            #log.debug("Poll period: " + str(feature_ll_value["server_poll_period"]))
             if looptime < feature_ll_value["last_poll"]+feature_ll_value["server_poll_period"]:   
                 poll=False
 
         if not poll:
             continue        
         try:
-            log.debug("Checking Licence Server at '" + key + "'...")
+            log.debug("Checking Licence Server at '" + key + "'... (period " + str(feature_ll_value["server_poll_period"]) + "s)" )
             shell_command_string=poll_methods[ll_value["server_poll_method"]]["shell_command"] % ll_value
             log.debug(shell_command_string)
 
@@ -645,7 +644,11 @@ def poll_remotes():
                     # if untracked_warning:
                     #     log.warning("Untracked features in use: " + untracked_warning)
                     last_lic=group_dic
-             
+                
+                global dash_update
+                dash_update=True
+                c.writemake_json(settings["path_store"], licence_list)
+
             except Exception as details:
                 log.error("Failed to fetch " + key + " " + str(details))
                 traceback.print_tb(sys.exc_info()[2])
@@ -756,21 +759,21 @@ def print_panel():
 
         
     dashboard+=("O=============^=============^=============^=============^=============^=============^=============^=============^=============^===========================^==========================O\n")
-    main_dashboard.refresh()
-    main_dashboard.addstr(1,0,dashboard)
-
+    #main_dashboard.refresh()
+    #main_dashboard.addstr(1,0,dashboard)
+    print(dashboard)
 
 def main():
+
 
     poll_remotes()
 
     get_nesi_use()
 
-    print_panel()
 
-    c.writemake_json(settings["path_store"], licence_list)
+    #
 
-main_dashboard = curses.initscr()
+#main_dashboard = curses.initscr()
 
 settings = c.readmake_json("settings.json")
 module_list = c.readmake_json(settings["path_modulelist"])
@@ -782,6 +785,7 @@ log.info("Starting...")
 slurm_permissions=get_slurm_permssions()
 
 # An error will be thrown if reservation is updated without change.
+
 last_update={}
 for cluster in settings["clusters"].keys():
     last_update[cluster]=""
