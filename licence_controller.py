@@ -5,9 +5,7 @@ import common as c
 from copy import deepcopy
 from pwd import getpwuid
 from grp import getgrgid
-from common import log
 from prometheus_client import start_http_server, Gauge
-
 # encoding: utf-8
 
 #=== TO DO ===#
@@ -856,6 +854,10 @@ def print_panel():
 
 settings = c.readmake_json("settings.json")
 module_list = c.readmake_json(settings["path_modulelist"])
+
+# Try import logger
+sys.path.append(os.path.abspath(settings["path_logger"]))
+from error_handle import log
 
 # Clear 
 open('run_as_admin.sh', 'w').close()
