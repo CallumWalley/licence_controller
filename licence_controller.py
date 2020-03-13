@@ -68,43 +68,61 @@ def ex_slurm_command(sub_input, level="administrator"):
         log.error("Writing command to 'run_as_admin.sh'")
 
         raise Exception("User does not have appropriate SLURM permissions to run this command.")
-def strip_non_ascii(string):
-    ''' Returns the string without non ASCII characters'''
-    stripped = (c for c in string if 0 < ord(c) < 127)
-    return ''.join(stripped)
-    # Some Servers have multiple features being tracked.
-    # Consolidate licence servers to avoid making multiple calls.
-    
-    log.info("Constructing polling object...")
-    # Just for info
-    server_count=0
-    feature_count=0
-
-    for key, ll_value in server_list.items():
-        if not ll_value['enabled']:
-            log.debug(key + "is disabled, not being added to poll object")
-            continue
-        if ll_value["server_address"] not in poll_list:
-            poll_list[ll_value["server_address"]]={"licence_file_path":ll_value["licence_file_path"], "server_poll_method":ll_value["server_poll_method"], "tokens":[]}
-            server_count+=1
-        feature_count+=1
-        poll_list[ll_value["server_address"]]["tokens"].append(ll_value)
-    log.info(str(server_count) + " servers being polled for " + str(feature_count) + " licence features.")
-def restart():
-    """Restarts licence controller"""
-    log.info("Restarting licence controller...")
-    c.writemake_json(settings["path_store"], server_list)
-    c.writemake_json(settings["path_meta"], licence_meta)
-
-    os.execl(sys.executable, sys.executable, *sys.argv)
 def validate():
     
     """Checks for inconinosistancies"""
-
     if os.environ.get("VALIDATE","").lower()=="false":
         log.info("Skipping validation")
         return
-    c.deep_merge(licence_meta, server_list)
+
+    for server in server_list:       
+        try:     
+            for key, value in settings["default"].items():
+                if key not in server:
+                    log.warning(str(server) + " missing property 'key'. Setting to default.")
+                    server[key]=value
+
+            #filename_end = "_" + ll_value["faculty"] if ll_value["faculty"] else ""
+            #standard_address = "/opt/nesi/mahuika/" + ll_value["software_name"] + "/Licenses/" + ll_value["institution"] + filename_end + ".lic"   
+            """Validates path attached to licence"""
+
+            statdat = os.stat(server["licence_file"]["path"])
+            file_name = server["licence_file"]["path"].split("/")[-1]
+
+            owner = getpwuid(statdat.st_uid).pw_name
+            group = getgrgid(statdat.st_gid).gr_name
+
+            # Check permissions of file
+            if statdat.st_mode == 432:
+                raise Exception(server["licence_file"]["path"] + " file address permissions look weird.")
+
+
+            if server["licence_file"]["group"] and group != server["licence_file"]["group"]:
+                log.warning(server["licence_file"]["path"] + ' group is "' + group + '", should be "' + server["licence_file"]["path"] + '".')
+
+            if owner != settings["user"]:
+                log.warning(server["licence_file"]["path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
+                    
+            # if ll_value["licence_file_path"] != standard_address and ll_value["software_name"] and ll_value["institution"]:
+            #     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
+            # Read lic file contents
+            with open(server["licence_file"]["path"]) as file:
+                sub_out = file.read()
+                match_address=poll_methods[server["server"]["poll_method"]]["details_pattern"].match(sub_out).groupdict()
+                if not server["server"]["address"]:
+                    server["server"]["address"]=match_address["server_address"]
+                elif server["server"]["address"]!=match_address["server_address"]:
+                    log.warning("Licence file address mismatch: " + server["server"]["address"] + " -> " + match_address["server_address"])               
+                if not server["server"]["port"]:
+                    server["server"]["port"]=match_address["server_port"]
+                elif server["server"]["port"]!=match_address["server_port"]:
+                    log.warning("Licence file address mismatch: " + server["server"]["port"] + " -> " + match_address["server_port"])
+
+        except Exception as details:
+            log.error("'" + server["licence_file"]["path"] + " has an invalid file path attached: " + str(details))
+            server["server"]["active"]=False
+            server["server"]["status"]="INVALID"
+
 
     # def _fill(ll_key, ll_value):
     #     """Guess at any missing properties, these replace default ll_values"""
@@ -154,51 +172,7 @@ def validate():
     #         ll_value["token_name"]=ll_key
     #         log.warning(ll_key + " token_name set to " + ll_value["token_name"])
 
-    # def _address(ll_key, ll_value):
-    #     """Validates path attached to licence"""
 
-    #     filename_end = "_" + ll_value["faculty"] if ll_value["faculty"] else ""
-    #     standard_address = "/opt/nesi/mahuika/" + ll_value["software_name"] + "/Licenses/" + ll_value["institution"] + filename_end + ".lic"   
-        
-    #     if ll_value["licence_file_path"]:                
-    #         try:
-    #             statdat = os.stat(ll_value["licence_file_path"])
-    #             file_name = ll_value["licence_file_path"].split("/")[-1]
-
-    #             owner = getpwuid(statdat.st_uid).pw_name
-    #             group = getgrgid(statdat.st_gid).gr_name
-
-    #             # Check permissions of file
-    #             if statdat.st_mode == 432:
-    #                 log.error(ll_key + " file address permissions look weird.")
-
-    #             if ll_value["licence_file_group"] and group != ll_value["licence_file_group"]:
-    #                 log.warning(ll_value["licence_file_path"] + ' group is "' + group + '", should be "' + ll_value["licence_file_group"] + '".')
-
-    #             if owner != settings["user"]:
-    #                 log.warning(ll_value["licence_file_path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
-                        
-    #             # if ll_value["licence_file_path"] != standard_address and ll_value["software_name"] and ll_value["institution"]:
-    #             #     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
-    #             # Read lic file contents
-    #             with open(ll_value["licence_file_path"]) as file:
-    #                 sub_out = file.read()
-    #             #raise Exception:
-    #             #        log.error("Failed to check " + ll_key + " licence file contents at " + ll_value["licence_file_path"] + ": " + str(details))
-    #             #else:
-                
-    #             match_address=poll_methods[ll_value["server_poll_method"]]["details_pattern"].match(sub_out).groupdict()
-    #             ll_value["server_address"]=match_address["server_address"]
-    #             ll_value["server_port"]=match_address["server_port"]
-    #             if "server_host_id" in match_address:
-    #                 ll_value["server_host_id"]=match_address["server_host_id"]
-                
-    #         except Exception as details:
-    #             log.error("'" + ll_key + " has an invalid file path attached: " + str(details))
-    #             ll_value["enabled"]=False
-    #     else:
-    #         ll_value["licence_file_path"]=standard_address
-    #         log.warning(ll_key + " licence path set to " + standard_address)
 
     # def _tokens(license_list):
     #     #Try get list of current slurm tokens
@@ -438,7 +412,7 @@ def validate():
 
     #_tokens(server_list)
 
-    #c.writemake_json(settings["path_store"], server_list)  
+    c.writemake_json(settings["path_store"], server_list)  
 def get_slurm_permssions():
     try:
         shell_string="sacctmgr show user ${USER} -Pn"
@@ -571,12 +545,12 @@ def poll_remote(server):
     # Skip if disabled or non existant.
     
     if "server" not in server or "active" not in server["server"]:
-        log.warning("Skipping server as invalid details.")   
+        log.warning("Skipping " + server["server"]["address"] + " as invalid details.")   
         server["server"]=settings["default"]["server"]
         server["server"]["status"]="INVALID"
         return
     if  not server["server"]["active"]:
-        log.info("Skipping server as disabled.")   
+        log.info("Skipping server " + server["server"]["address"] + " as disabled.")   
         server["server"]["status"]="DISABLED"
         return
     try:
@@ -656,99 +630,17 @@ def poll_remote(server):
             tracked_feature["prometheus_gauge"].set(feature["usage_all"])
             # feature["usage_all"]=0
             # feature["usage_nesi"]=0
-        # # Clear from last loop
-        # for feature_ll_value in ll_value["tokens"]:
-        #     # Record to running history
-        #     feature_ll_value["history"].append(feature_ll_value["real_usage_all"])
-        #         # Pop extra array entries
-        #     while len(feature_ll_value["history"]) > feature_ll_value["history_points"]:
-        #         feature_ll_value["history"].pop(0)
 
-        #     feature_ll_value["real_usage_all"]=0
-        #     feature_ll_value["real_usage_nesi"]=0
-        #     feature_ll_value["users_nesi"]={}
-        # try:
-        #     sub_return=subprocess.check_output(shell_command_string, shell=True).strip().decode("utf-8",  "replace")    #Removed .decode("utf-8") as threw error.     
-        #     #print(strip_non_ascii(sub_return).decode("utf-8"))
-        #     log.debug(key + " OK")
-        #     features=poll_methods[ll_value["server_poll_method"]]["licence_pattern"].finditer(sub_return)
-        #     # Create object from output.
-            
-        #     last_lic={}
-            
-        #     for licence in features:
-        #         untracked_warning="" # Message about untracked features.
-        #         group_dic=licence.groupdict()
-
-        #         # Continue if partial match
-        #         if group_dic["user"] == None:
-        #             last_lic=group_dic
-        #             continue
-
-        #         # Squash feature header
-        #         if group_dic["feature"] == None:
-        #             if "feature" in last_lic and last_lic["feature"]!=None:
-        #                 group_dic["feature"]=last_lic["feature"]
-        #             else:
-        #                 last_lic=group_dic
-        #                 continue
-
-        #         if "count" not in group_dic or group_dic["count"] == None:
-        #             group_dic["count"] = 1
-
-        #         match_cluster=cluster_pattern.match(group_dic["host"])
-
-        #         # If not on nesi, set host to 'remote'
-        #         if match_cluster is None:
-        #             group_dic["host"]="remote"
-        #         else:
-        #             group_dic["host"]=match_cluster.group(0)
-
-        #         tracked_on_nesi=False
-        #         for token in ll_value["tokens"]:
-        #             # If tracked feature. Count
-        #             if group_dic["feature"].lower().strip() == token["licence_feature_name"].lower():
-        #                 token["real_usage_all"]+=int(group_dic["count"])
-        #                 tracked_on_nesi=True
-        #                 if group_dic["host"]!="remote":
-                            
-        #                     token["real_usage_nesi"]+=int(group_dic["count"])
-
-        #                     if group_dic["user"] not in token["users_nesi"]:
-        #                         token["users_nesi"][group_dic["user"]]={"count":0, "tokens":0, "sockets":[]}
-
-        #                     token["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
-        #                     token["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"]) 
-
-        #             token["server_status"]="OK"    
-                                        
-        #         if group_dic["host"].strip()!="remote" and (not tracked_on_nesi):
-        #             untracked_warning+= "\n    " + group_dic["host"] + " - '" + group_dic["feature"] + "'    '" + key + "'"                
-        #         # if untracked_warning:
-        #         #     log.warning("Untracked features in use: " + untracked_warning)
-        #         last_lic=group_dic
-            
-        #     global dash_update
-        #     dash_update=True
-        #     c.writemake_json(settings["path_store"], server_list)
-
-        # except Exception as details:
-        #     log.error("Failed to fetch " + key + " " + str(details))
-        #     traceback.print_tb(sys.exc_info()[2])
-
-        #     for token in ll_value["tokens"]:
-        #         token["server_status"]="FAIL"
-        #         ll_value["active"]=False
-        #         log.error("Fully soaking '" + ll_value["token_name"] + "'!!")   
-        
     except Exception as details:
         log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " " + str(details))  
         server["server"]["status"]="DOWN"     
     else:
         server["server"]["status"]="OK"
         print("Do thing")
+        c.writemake_json(settings["path_store"], server_list)  
         schedul.enter(server["server"]["poll_period"], 1, poll_remote, argument=(server,))
         
+
         # for feature_ll_value in ll_value["tokens"]:
         #     feature_ll_value["last_poll"]=time.time()
         #     do_maths(feature_ll_value)
@@ -880,8 +772,13 @@ if os.environ["USER"] != settings["user"] and not os.environ.get("CHECKUSER","")
 log.debug(json.dumps(settings))
 
 #licence_meta = c.readmake_json(settings["path_meta"])
-server_list = c.readmake_json(settings["path_store"])
+try:
+    server_list = c.readmake_json(settings["path_store"])
+except Exception as reason:
+    log.error(settings["path_store"] + " JSON read error.")
+    raise Exception(str(reason))
 
+json.decoder.JSONDecodeError
 # Start prom server
 try:
     start_http_server(8860)
@@ -898,7 +795,7 @@ else:
 monitors=[]
 
 
-#validate()
+validate()
 
 schedul = sched.scheduler(time.time, time.sleep)
 for server in server_list:    
