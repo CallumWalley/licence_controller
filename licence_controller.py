@@ -76,12 +76,18 @@ def validate():
         return
 
     for server in server_list:       
-        try:     
-            for key, value in settings["default"].items():
+        try:
+
+            for key, value in settings["default_server"].items():
                 if key not in server:
-                    log.warning(str(server) + " missing property 'key'. Setting to default.")
+                    log.warning(str(server) + " missing property '" + key + "'. Setting to default.")
                     server[key]=value
 
+            for feature in server["tracked_features"]:
+                for key, value in settings["default_feature"].items():
+                    if key not in feature:
+                        log.warning(str(feature["feature_name"]) + " missing property '" + key + "'. Setting to default.")
+                        feature[key]=value
             #filename_end = "_" + ll_value["faculty"] if ll_value["faculty"] else ""
             #standard_address = "/opt/nesi/mahuika/" + ll_value["software_name"] + "/Licenses/" + ll_value["institution"] + filename_end + ".lic"   
             """Validates path attached to licence"""
@@ -98,7 +104,7 @@ def validate():
 
 
             if server["licence_file"]["group"] and group != server["licence_file"]["group"]:
-                log.warning(server["licence_file"]["path"] + ' group is "' + group + '", should be "' + server["licence_file"]["path"] + '".')
+                log.warning(server["licence_file"]["path"] + ' group is "' + group + '", should be "' + server["licence_file"]["group"] + '".')
 
             if owner != settings["user"]:
                 log.warning(server["licence_file"]["path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
@@ -112,12 +118,11 @@ def validate():
                 if not server["server"]["address"]:
                     server["server"]["address"]=match_address["server_address"]
                 elif server["server"]["address"]!=match_address["server_address"]:
-                    log.warning("Licence file address mismatch: " + server["server"]["address"] + " -> " + match_address["server_address"])               
+                    log.warning( file_name + " address mismatch: " + server["server"]["address"] + " -> " + match_address["server_address"])               
                 if not server["server"]["port"]:
                     server["server"]["port"]=match_address["server_port"]
                 elif server["server"]["port"]!=match_address["server_port"]:
-                    log.warning("Licence file address mismatch: " + server["server"]["port"] + " -> " + match_address["server_port"])
-
+                    log.warning(file_name + " port mismatch: " + server["server"]["port"] + " -> " + match_address["server_port"])
         except Exception as details:
             log.error("'" + server["licence_file"]["path"] + " has an invalid file path attached: " + str(details))
             server["server"]["active"]=False
@@ -454,7 +459,7 @@ def get_nesi_use():
     # For each cluster
     for cluster, status in settings["clusters"].items():
         if not "enabled" in status or not status["enabled"]:
-            log.info("Cluster " + cluster + " disabled or missing details.")
+            log.info("Skipping cluster " + cluster + " disabled or missing details.")
             continue
         # Search squeue for running or pending jobs
         sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_string
@@ -562,6 +567,8 @@ def poll_remote(server):
         sub_return=subprocess.check_output(shell_command_string, shell=True).strip().decode("utf-8",  "replace")    #Removed .decode("utf-8") as threw error.     
         users=poll_methods[server["server"]["poll_method"]]["licence_pattern"].finditer(sub_return)
 
+        if len(server["tracked_features"]) < 1:
+            log.warning("No features are being tracked on " + server["server"]["address"])
         # Clear previous totals
         for tracked_feature in server["tracked_features"]:
             tracked_feature["usage_all"]=0
@@ -747,9 +754,16 @@ def print_panel():
 settings = c.readmake_json("settings.json")
 module_list = c.readmake_json(settings["path_modulelist"])
 
+
+
 # Try import logger
 sys.path.append(os.path.abspath(settings["path_logger"]))
 from error_handle import log
+
+# Is correct user
+if os.environ["USER"] != settings["user"] and not os.environ.get("CHECKUSER","").lower()=="false":
+    log.error("Command should be run as '" + settings["user"] + "' as it owns licence files. ('export CHECKUSER=FALSE' to disable this check)")
+    exit()
 
 # Clear 
 open('run_as_admin.sh', 'w').close()
@@ -762,12 +776,6 @@ slurm_permissions=get_slurm_permssions()
 
 #Settings need to be fixed
 fix_slurm_share=True
-
-
-# Is correct user
-if os.environ["USER"] != settings["user"] and not os.environ.get("CHECKUSER","").lower()=="false":
-    log.error("Command should be run as '" + settings["user"] + "' as it owns licence files. ('export CHECKUSER=FALSE' to disable this check)")
-    exit()
 
 log.debug(json.dumps(settings))
 
