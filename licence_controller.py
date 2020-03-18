@@ -37,7 +37,7 @@ poll_methods={
         "shell_command":"linx64/lmutil lmstat -a -c %(path)s",
         "licence_pattern":re.compile(r"^(Users of )*(?P<feature>\S+):  \(Total of (?P<total>\d+).*|\n*^\s*(?P<user>\S*)\s*(?P<host>\S*).*\s(?P<date>\d+\/\d+)\s(?P<time>[\d\:]+).*$",flags=re.M),
         "feature_pattern":"",
-        "server_pattern":"",
+        "server_pattern":re.compile(r"^.* license server (?P<last_stat>.*) v(?P<version>.*)$",flags=re.M),
         "details_pattern":re.compile(r"SERVER\s+(?P<server_address>\S*)\s+(?P<server_>\d*|ANY)\s(?P<server_port>[\d|,]*)")
     },
     "null":{
@@ -82,11 +82,11 @@ def validate():
                     log.info(str(server) + " missing property '" + key + "'. Setting to default.")
                     server[key]=value
 
-            for feature in server["tracked_features"]:
+            for feature, feature_values  in server["tracked_features"].items():
                 for key, value in settings["default_feature"].items():
-                    if key not in feature:
-                        log.info(feature["feature_name"] + " missing property '" + key + "'. Setting to default.")
-                        feature[key]=value
+                    if key not in feature_values:
+                        log.info(feature + " missing property '" + key + "'. Setting to default.")
+                        feature_values[key]=value
             #filename_end = "_" + ll_value["faculty"] if ll_value["faculty"] else ""
             #standard_address = "/opt/nesi/mahuika/" + ll_value["software_name"] + "/Licenses/" + ll_value["institution"] + filename_end + ".lic"   
             """Validates path attached to licence"""
@@ -438,14 +438,12 @@ def get_nesi_use():
         if "tracked_features" not in licence:
             # Skip if no features
             continue
-        for feature in licence["tracked_features"]:
+        for feature in licence["tracked_features"].keys():
             all_licence_string+=feature["token_name"] + ","
 
     # Return if nothing to check.
     if not all_licence_string:
         return
-
-
     # "clusters":{
     #     "mahuika":{
     #         "enabled":true
@@ -473,7 +471,7 @@ def get_nesi_use():
             # Set current usage to zero
             for server in server_list:
                 if not "tracked_features" in server: continue              
-                for feature in server["tracked_features"]:
+                for feature in server["tracked_features"].values():
                     if not "token_usage" in feature: continue                  
                     feature["token_usage"]=0
 
@@ -498,7 +496,7 @@ def get_nesi_use():
                         licence_token_count = licence_token.split(':')[1] if len(licence_token.split(':'))>1 else 1
 
                         for licence in server_list:
-                            for feature in licence["tracked_features"]:
+                            for feature, feature_values in licence["tracked_features"].items():
                                 if feature['token_name'] == licence_token_name:
                                     feature["token_usage"]+=int(licence_token_count)
                                     if username not in feature["users_nesi"]:
@@ -515,7 +513,7 @@ def get_nesi_use():
                             ##licence_meta[licence_token_name]={}
                             #restart()
             except Exception as e:
-                print(e)
+                log.error(str(e))
         schedul.enter(max(settings["squeue_poll_period"],5), 1, get_nesi_use)   
 def do_maths(value):
     
@@ -564,115 +562,113 @@ def poll_remote(server):
         log.debug(shell_command_string)
 
         sub_return=subprocess.check_output(shell_command_string, shell=True).strip().decode("utf-8",  "replace")    #Removed .decode("utf-8") as threw error.     
-        lines=poll_methods[server["server"]["poll_method"]]["licence_pattern"].finditer(sub_return)
+        log.debug(sub_return)
+        # Match server details
+        server_re_match=poll_methods[server["server"]["poll_method"]]["server_pattern"].search(sub_return)
+        if server_re_match == None: return
 
-        if len(server["tracked_features"]) < 1:
+        server_re_match_group=server_re_match.groupdict()
+        log.debug(json.dumps(server_re_match_group))
+
+        server["server"]["status"]=server_re_match_group["last_stat"]
+        server["server"]["version"]=server_re_match_group["version"]
+        #server["server"]["last_time"]=server_re_match_group["last_time"]
+
+        featureanduser_re_match=poll_methods[server["server"]["poll_method"]]["licence_pattern"].finditer(sub_return)
+        if len(server["tracked_features"].keys()) < 1:
             log.warning("No features are being tracked on " + server["server"]["address"])
         # Clear previous totals
-        for tracked_feature in server["tracked_features"]:
+        for tracked_feature in server["tracked_features"].values():
             tracked_feature["usage_all"]=0
             tracked_feature["usage_nesi"]=0
             tracked_feature["users_nesi"]={}
         # Read regex by line.
-        for line in lines:
-            group_dic=line.groupdict()
-
-            
-            #print(poll_methods[server["server"]["poll_method"]]["licence_pattern"].match(line))
-
-            # Continue if partial match
-            if group_dic["user"] == None:
-                last_lic=group_dic
-                log.debug("Partial match")
+        for featureorline in featureanduser_re_match:
+            group_dic=featureorline.groupdict()
                 
-                continue
+            # If this is the case, it is a feature header.
+            if group_dic["feature"] != None:
+                last_lic=group_dic
+                log.debug("feature match")
+                tracked=False
+                if group_dic["feature"] in server["tracked_features"].keys():
+                    log.debug(group_dic["feature"] + " is tracked feature")
+                    # Last_lic points to the licecne objects.
+                    tracked=True
+                    last_lic=server["tracked_features"][group_dic["feature"]]
 
-            # Squash feature header
-            if group_dic["feature"] == None:
-                if "feature" in last_lic and last_lic["feature"]!=None:
-                    group_dic["feature"]=last_lic["feature"]
-                if "total" in last_lic and int(last_lic["total"]) > 0:
-                    group_dic["total"]=int(last_lic["total"])
-                else:
-                    last_lic=group_dic
+                    if last_lic["total"] != int(group_dic["total"]):
+                        log.warning("total was " + str(last_lic["total"]) + " at last count, now " + str(group_dic["total"]))
+                        last_lic["total"]=int(group_dic["total"])
+
+                elif group_dic["feature"] in server["untracked_features"]:
+                    last_lic=group_dic["feature"]
+                    log.debug(group_dic["feature"] + " is untracked feature")
                     continue
+                else:
+                    server["untracked_features"].append(group_dic["feature"])
+                    last_lic=group_dic["feature"]
+                    log.warning(group_dic["feature"] + " being added to untracked features.")
 
-            if "count" not in group_dic or group_dic["count"] == None:
-                group_dic["count"] = 1
+            elif last_lic == None: continue # If not feature header we dont care.
 
-            match_cluster=cluster_pattern.match(group_dic["host"])
+            # If this is the case, it is a user.
+            if group_dic["user"] != None:
+                log.debug("user match")
+                match_cluster=cluster_pattern.match(group_dic["host"])
 
-            # Iterate count if tracked
-            for feature in server["tracked_features"]:
-                if feature["feature_name"] == group_dic["feature"]:
-                    feature["usage_all"]+=int(group_dic["count"])
-                    
-            # If not on nesi, set host to 'remote'
-            if match_cluster is None:
-                group_dic["host"]="remote"
+                if tracked:
+                    # Count gets added regardless of socket
+                    if "count" in group_dic and group_dic["count"].isdigit():
+                        lic_count=int(group_dic["count"])
+                    else:
+                        lic_count=1
 
-            else:
-                group_dic["host"]=match_cluster.group(0)
-                accounted_for=False
+                    last_lic["usage_all"] += lic_count
 
-                # Check if feature is tracked.
-                for feature in server["tracked_features"]:
-                    if feature["feature_name"] == group_dic["feature"]:
-                        
+                    # Count gets added regardless of socket
+                    if match_cluster:
+                        # If user not already. Add them.
+                        if group_dic["user"] not in last_lic["users_nesi"]:
+                            last_lic["users_nesi"][group_dic["user"]]={"count":0, "tokens":0, "sockets":[]}
 
-
-                        # Flag to notify if untracked feature being used
-                        accounted_for=True
-
-                        if group_dic["user"] not in feature["users_nesi"]:
-                            feature["users_nesi"][group_dic["user"]]={"count":0, "tokens":0, "sockets":[]}
-
-                        if feature["total"] != group_dic["total"]:
-                            log.warning(feature["feature_name"] + " total was " + str(feature["total"]) + " at last count, now " + str(group_dic["total"]))
-                            feature["total"]=int(group_dic["total"])
-
-                        feature["usage_nesi"]+=int(group_dic["count"])
-                        feature["users_nesi"][group_dic["user"]]["count"]+=int(group_dic["count"])
-                        feature["users_nesi"][group_dic["user"]]["sockets"].append(group_dic["host"]) 
-                        break
-
-                if not accounted_for:
-
-                    log.warning("Untracked feature: " + group_dic["feature"] + " being used by " + group_dic["user"] + " on " + group_dic["host"])
-
-            # Set this as last licence
-            last_lic=group_dic
+                        last_lic["usage_nesi"]+=lic_count
+                        last_lic["users_nesi"][group_dic["user"]]["count"]+=lic_count
+                        last_lic["users_nesi"][group_dic["user"]]["sockets"].append(match_cluster.group(0))                 
+                else:
+                    if match_cluster:
+                        log.warning("Untracked feature: " + last_lic + " being used by " + group_dic["user"] + " on " + group_dic["host"])
 
         # Math
-        for tracked_feature in server["tracked_features"]:
+        for tracked_feature_name, tracked_feature_values in server["tracked_features"].items():
             # Do math    
             log.info("Doing maths...")
             hour_index = dt.datetime.now().hour - 1
 
             # Find modified in use value
-            interesting = max(tracked_feature["history"])-tracked_feature["token_usage"]
+            interesting = max(tracked_feature_values["history"])-tracked_feature_values["token_usage"]
 
-            if not tracked_feature['enabled']:
-                tracked_feature["token_soak"]=tracked_feature["total"]
-                log.warning("Fully soaking " + tracked_feature["token_name"])
+            if not tracked_feature_values['enabled']:
+                tracked_feature_values["token_soak"]=tracked_feature_values["total"]
+                log.warning("Fully soaking " + tracked_feature_values["token_name"])
             else:
-                tracked_feature["token_soak"] = int(min(
-                    max(interesting,0), tracked_feature["total"]
+                tracked_feature_values["token_soak"] = int(min(
+                    max(interesting,0), tracked_feature_values["total"]
                 ))
 
             # Update average
-            tracked_feature["hourly_averages"][hour_index] = (
+            tracked_feature_values["hourly_averages"][hour_index] = (
                 round(
-                    ((tracked_feature["usage_all"] * settings["point_weight"]) + (tracked_feature["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
+                    ((tracked_feature_values["usage_all"] * settings["point_weight"]) + (tracked_feature_values["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
                     2,
                 )
-                if tracked_feature["hourly_averages"][hour_index]
-                else tracked_feature["usage_all"]
+                if tracked_feature_values["hourly_averages"][hour_index]
+                else tracked_feature_values["usage_all"]
             )
 
             # Promethius
-            if not "prometheus_gauge" in tracked_feature: continue
-            tracked_feature["prometheus_gauge"].set(feature["usage_all"])
+            if not "prometheus_gauge" in tracked_feature_values: continue
+            tracked_feature_values["prometheus_gauge"].set(tracked_feature_values["usage_all"])
             # feature["usage_all"]=0
             # feature["usage_nesi"]=0
 
@@ -681,8 +677,6 @@ def poll_remote(server):
         log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " " + str(details))  
         server["server"]["status"]="DOWN"     
     else:
-        server["server"]["status"]="OK"
-        print("Do thing")
         c.writemake_json(settings["path_store"], server_list)  
         schedul.enter(server["server"]["poll_period"], 1, poll_remote, argument=(server,))
         
@@ -752,8 +746,8 @@ def apply_soak():
         else:
             log.info( cluster + " reservation updated successfully!")
 #def promethisise():
-    for monitor in monitors:
-            next(monitor)
+    # for monitor in monitors:
+    #         next(monitor)
 def print_panel():
     def fit_2_col(inval, colsize=13):
         """Trims whatever value input to colsize and centres it"""
@@ -774,11 +768,11 @@ def print_panel():
         dashboard+=("O========================================+=========+=============+=============+=============+=============+=============+======================================================O\n")
         dashboard+=("|" + fit_2_col(server["server"]["address"],40) + "|" + fit_2_col(server["server"]["status"],9) + "|"+ "             |"*5 + "                                                      |\n" )
 
-        for feature in server["tracked_features"]:
+        for feature_key, feature_value in server["tracked_features"].items():
             try:
-                dashboard+=("|" + " "*19 + "L" + fit_2_col(feature["feature_name"],20) + "|" + fit_2_col(feature["total"],9) + "|" + fit_2_col(feature["hourly_averages"][hour_index]) + "|"  + fit_2_col(feature["usage_all"]) + "|" + fit_2_col(feature["usage_nesi"]) + "|" + fit_2_col(feature["token_usage"]) + "|" + fit_2_col(feature["token_soak"]) + "|                                                      |\n")
-                if feature["usage_nesi"]:
-                    for user, usage in feature["users_nesi"].items():
+                dashboard+=("|" + " "*19 + "L" + fit_2_col(feature_key,20) + "|" + fit_2_col(feature_value["total"],9) + "|" + fit_2_col(feature_value["hourly_averages"][hour_index]) + "|"  + fit_2_col(feature_value["usage_all"]) + "|" + fit_2_col(feature_value["usage_nesi"]) + "|" + fit_2_col(feature_value["token_usage"]) + "|" + fit_2_col(feature_value["token_soak"]) + "|                                                      |\n")
+                if feature_value["usage_nesi"]:
+                    for user, usage in feature_value["users_nesi"].items():
                         dashboard+=("|" + " "*29 + "L" + fit_2_col(user,10) + "|         |             |             |" + fit_2_col(usage["count"]) + "|" + fit_2_col(usage["tokens"]) + "|             |" + fit_2_col(",".join(usage["sockets"]),54) + "|\n")
             except Exception as details: log.error("Wonky line in dashboard " + str(type(details)) + " " + str(details))
             
@@ -825,7 +819,7 @@ except Exception as reason:
     log.error(settings["path_store"] + " JSON read error.")
     raise Exception(str(reason))
 
-json.decoder.JSONDecodeError
+
 # Start prom server
 try:
     start_http_server(8860)
@@ -834,9 +828,9 @@ except Exception as details:
 else:
     for server in server_list:
         if "tracked_features" not in server: continue
-        for tracked_feature in server["tracked_features"]:
-            if "prometheus_gauge" not in tracked_feature: continue
-            tracked_feature["prometheus_gauge"] = Gauge(tracked_feature["token_name"] +'_license_tokens_used', tracked_feature["name"] +' license tokens in use according to the license server')
+        for tracked_feature_key, tracked_feature_values  in server["tracked_features"].items():
+            if "prometheus_gauge" not in tracked_feature_values: continue
+            tracked_feature_values["prometheus_gauge"] = Gauge(tracked_feature_key +'_license_tokens_used', tracked_feature_values["name"] +' license tokens in use according to the license server')
 
 # Promethius Monitors
 monitors=[]
@@ -847,7 +841,7 @@ validate()
 schedul = sched.scheduler(time.time, time.sleep)
 for server in server_list:    
     poll_remote(server)
-get_nesi_use() 
+#get_nesi_use() 
 print_panel()           
 
 # Will run as long as items scehudelddeld
