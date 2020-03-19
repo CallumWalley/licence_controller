@@ -575,7 +575,6 @@ def poll_remote(server):
             # If this is the case, it is a feature header.
             if group_dic["feature"] != None:
                 last_lic=group_dic
-                log.debug("feature match")
                 tracked=False
                 if group_dic["feature"] in server["tracked_features"].keys():
                     log.debug(group_dic["feature"] + " is tracked feature")
@@ -596,11 +595,10 @@ def poll_remote(server):
                     last_lic=group_dic["feature"]
                     log.warning(group_dic["feature"] + " being added to untracked features.")
 
-            elif last_lic == None: continue # If not feature header we dont care.
+            elif exists(last_lic) or last_lic == None: continue # If not feature header we dont care.
 
             # If this is the case, it is a user.
             if group_dic["user"] != None:
-                log.debug("user match")
                 match_cluster=cluster_pattern.match(group_dic["host"])
 
                 if tracked:
@@ -704,7 +702,7 @@ def apply_soak():
     
     def _update_res(cluster, soak):
         log.info("Attempting to update " + cluster + " reservation.")
-
+        
         sub_input = "scontrol update -M " + cluster + " ReservationName=" + res_name + " " + soak
         ex_slurm_command(sub_input,"operator")
 
@@ -728,14 +726,10 @@ def apply_soak():
             if not tracked_feature_value['enabled']: continue
             if not tracked_feature_value['token_name']: continue
 
-            for cluster in tracked_feature_value["clusters"]:
-
-                if cluster not in res_update_strings:
-
-                    res_update_strings[cluster] =  " licenses="
-                
+            for cluster in tracked_feature_value["clusters"]:         
                 if tracked_feature_value["token_soak"]:
-
+                    if cluster not in res_update_strings:
+                        res_update_strings[cluster] =  " licenses="
                     res_update_strings[cluster] += tracked_feature_value['token_name'] + ":" + str(tracked_feature_value["token_soak"]) + ","    
 
         log.debug("Contructing reservation strings")
