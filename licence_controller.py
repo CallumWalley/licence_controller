@@ -568,6 +568,9 @@ def poll_remote(server):
             tracked_feature["usage_all"]=0
             tracked_feature["usage_nesi"]=0
             tracked_feature["users_nesi"]={}
+        
+        last_lic=None
+        
         # Read regex by line.
         for featureorline in featureanduser_re_match:
             group_dic=featureorline.groupdict()
@@ -595,7 +598,7 @@ def poll_remote(server):
                     last_lic=group_dic["feature"]
                     log.warning(group_dic["feature"] + " being added to untracked features.")
 
-            elif exists(last_lic) or last_lic == None: continue # If not feature header we dont care.
+            elif last_lic == None: continue # If not feature header we dont care.
 
             # If this is the case, it is a user.
             if group_dic["user"] != None:
