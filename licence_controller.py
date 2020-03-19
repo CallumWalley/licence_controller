@@ -88,9 +88,9 @@ def validate():
                     if key not in feature_values:
                         log.info(feature + " missing property '" + key + "'. Setting to default.")
                         feature_values[key]=value
-            #filename_end = "_" + ll_value["faculty"] if ll_value["faculty"] else ""
-            #standard_address = "/opt/nesi/mahuika/" + ll_value["software_name"] + "/Licenses/" + ll_value["institution"] + filename_end + ".lic"   
-            """Validates path attached to licence"""
+                # Notify if no cluster set
+                if feature_values["enabled"] and feature_values["token_name"] and len(feature_values["clusters"])<1:
+                    log.warning(feature + " is enabled, has a token name, but is not assigned any cluster")
 
             statdat = os.stat(server["licence_file"]["path"])
             file_name = server["licence_file"]["path"].split("/")[-1]
@@ -128,295 +128,6 @@ def validate():
             server["server"]["active"]=False
             server["server"]["status"]="INVALID"
 
-
-    # def _fill(ll_key, ll_value):
-    #     """Guess at any missing properties, these replace default ll_values"""
-
-    #     if not ll_value["license_type"] and len(ll_key.split("@")[0].split('_'))>1:
-    #         ll_value["license_type"] = ll_key.split("@")[0].split('_')[1]
-    #         log.warning(ll_key + " license_type set to " + ll_value["license_type"])
-
-    #     if not ll_value["software_name"]:
-    #         ll_value["software_name"] = ll_key.split("@")[0].split('_')[0]        
-    #         log.warning(ll_key + " software_name set to " + ll_value["software_name"])
-
-    #     if not ll_value["licence_feature_name"] and len(ll_key.split("@")[0].split('_'))>1:
-    #         ll_value["licence_feature_name"] = ll_key.split("@")[0].split('_')[1]
-    #         log.warning(ll_key + " licence_feature_name set to " + ll_value["licence_feature_name"])
-
-    #     if len(ll_key.split("@"))>1:
-    #         if not ll_value["institution"]:
-    #             ll_value["institution"] = ll_key.split("@")[1].split('_')[0]
-    #             log.warning(ll_key + " institution set to " + ll_value["institution"])
-
-    #         if not ll_value["faculty"] and len(ll_key.split("@")[1].split('_'))>1:
-    #             ll_value["faculty"] = ll_key.split("@")[1].split('_')[1]
-    #             log.warning(ll_key + " faculty set to " + ll_value["faculty"])
-
-    #     if not ll_value["licence_file_group"] and ll_value["institution"]:
-    #         ll_value["licence_file_group"] = ll_value["institution"]+"-org"
-    #         log.warning(ll_key + " licence_file_group set to " + ll_value["licence_file_group"])
-        
-    #     if not ll_value["hourly_averages"] or not len(ll_value["hourly_averages"]) == 24:
-    #         ll_value["hourly_averages"] = [0] * 24
-    #         log.warning(ll_key + " file_group set.")
-
-    #     if not ll_value["server_name"]:
-    #         ll_value["server_name"]=ll_value["institution"]
-    #         if ll_value["faculty"]:
-    #             ll_value["server_name"] += "_" + ll_value["faculty"]
-    #         log.warning(ll_key + " file_group set to " + ll_value["server_name"])
-
-    #     if not ll_value["licence_name"]:
-    #         ll_value["licence_name"]=ll_value["software_name"].lower()
-    #         if ll_value["license_type"]:
-    #             ll_value["licence_name"] += "_" + ll_value["license_type"]
-    #         log.warning(ll_key + " file_group set to " + ll_value["licence_name"])
-
-    #     if not ll_value["token_name"]:
-    #         ll_value["token_name"]=ll_key
-    #         log.warning(ll_key + " token_name set to " + ll_value["token_name"])
-
-
-
-    # def _tokens(license_list):
-    #     #Try get list of current slurm tokens
-    #     # Try to fix a token if incorrect.
-    #     def __update_token_count():
-    #         log.info("Attempting to modify SLURM token " + key)
-
-    #         if not ll_value["institution"]:         
-    #             raise Exception("Token not created. Missing 'instituiton'.")               
-    #         if not ll_value["real_total"]:         
-    #             raise Exception("Token not created. Missing 'real_total'.")   
-    #         if not ll_value["software_name"]:         
-    #             raise Exception("Token not created. Missing 'software_name'")
-
-    #         sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " set Count=" + str(correct_count)
-    #         ex_slurm_command(sub_input)
-
-    #     def __update_token_share(cluster):
-
-    #         log.info("Attempting to modify SLURM token " + key + " for " + cluster)
-
-    #         if not (ll_value["institution"] and ll_value["real_total"] and ll_value["software_name"]):         
-    #             raise Exception("Token not created. Missing one or more of 'instituiton', 'software_name', 'real_total'.")               
-            
-    #         sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] +  " set percentallowed=" + str(correct_share) + " where cluster=" + cluster
-    #         ex_slurm_command(sub_input)
-
-    #     #Try to create  a token if missing.
-    #     def __create_token(cluster):
-    #         log.info("Attempting to create SLURM token " + key + " for " + cluster)
-
-    #         for value in ["licence_name", "server_name"]:
-    #             if not (ll_value[value]):         
-    #                 raise Exception("Token not created. Missing '" + value + "'.")         
-
-    #         sub_input="sacctmgr -i add resource Name=" + ll_value["licence_name"] + " Server=" + ll_value["server_name"] + " Count=" + str(correct_count) + " Type=License percentallowed=" + str(correct_share) +" where cluster=" + cluster
-
-    #         ex_slurm_command(sub_input)
-
-    #     try:
-    #         sub_input="sacctmgr -pns show resource withcluster"
-    #         log.debug(sub_input)
-    #         string_data=ex_slurm_command(sub_input, "operator").strip()
-    #     except Exception as details:
-    #         log.error("Failed to check SLURM tokens. " + str(details))
-    #     else:
-    #         active_token_dict = {}
-
-
-    #         # Format output data into dictionary 
-    #         for lic_string in string_data.split("\n"):
-    #             str_arr=lic_string.split("|")
-
-    #             if str_arr[0] + "@" + str_arr[1] not in active_token_dict.keys():
-    #                 active_token_dict[str_arr[0] + "@" + str_arr[1]]={'token_name':str_arr[0], 'server_name':str_arr[1],'count':int(str_arr[3]), 'share_total':int(str_arr[4]), 'clusters':{}}
-                
-    #             active_token_dict[str_arr[0] + "@" + str_arr[1]]['clusters'][str_arr[6]]=int(str_arr[7])
-    #             log.debug(lic_string)
-
-    #         #print(json.dumps(active_token_dict))
-
-    #         for ll_key, ll_value in server_list.items():
-
-    #             # SLURM requires that each cluster is given a fraction of the full licence pool. 
-    #             # In order to allow ALL clusters full access to the pool the total number of licence is set at <# clusters> * actual licence count.
-    #             # However this means if multiple pulls of tokens are made across 2 clusters SLURM will be suprised when the licence tracker catches up with the token count.
-    #             # TO IMPLIMENT
-    #             # Temporary allocations need to be made to correspond to scheduled licence useage on other cluster.
-                
-    #             number_clusters=len(ll_value["clusters"])
-                
-    #             if number_clusters < 1 :
-    #                 log.error(ll_key + " not active on any clusters?")
-    #                 ll_value["enabled"]=False
-    #                 log.info("Disabling licence " + ll_key + ".")
-    #                 ll_value["server_status"]="NO_CLUSTER"
-    #                 continue
-
-    #             correct_share=int(100/number_clusters)
-    #             correct_count=ll_value["real_total"] *  number_clusters
-    #             log.debug("Licence '" + ll_key + "' is in use on " + str(number_clusters) + " cluster(s) ( " + (", ".join(ll_value["clusters"])) + " ).")
-
-    #             # Currently token being on one cluster but not the other will NOT throw error. Fix!
-
-    #             if ll_key not in active_token_dict.keys():
-    #                 log.error(ll_key + " not in SACCT database. Attempting to add.")
-    #                 try:
-    #                     for cluster in ll_value["clusters"]:
-    #                         __create_token(cluster)
-    #                 except Exception as details:
-    #                     log.error("Failed to add SLURM licence token: " + str(details))
-    #                     ll_value["enabled"]=False
-    #                     log.info("Disabling licence " + ll_key + ".")
-    #                     ll_value["server_status"]="NULL_TOKEN"        
-    #                     continue       
-    #                 else:
-    #                     log.info("SLURM token successfully added.")
-    #                     restart()
-
-    #             for cluster, share in active_token_dict[ll_key]["clusters"].items():
-    #                 if correct_share != share:
-    #                     log.error(ll_key + " has cluster share incorrectly set in SACCT database on " + cluster + " ( '" + str(share) +  "' should be '" + str(correct_share) + "'). Attempting to fix.")
-    #                     if fix_slurm_share:
-    #                         try:
-    #                             __update_token_share(cluster)
-    #                             # for cluster in ll_value["clusters"]:
-    #                             #     if cluster not in settings["clusters"] or "enabled" not in settings["clusters"][cluster] or not settings["clusters"][cluster]["enabled"]:
-    #                             #         continue
-                                    
-    #                         except Exception as details:
-    #                             log.error("Failed to update SLURM token: " + str(details))
-    #                             log.info("Disabling licence " + ll_key + ".")
-
-    #                             ll_value["enabled"]=False
-    #                             ll_value["server_status"]="SELFISH_TOKEN"
-    #                             continue
-    #                         else:
-    #                             log.info("SLURM token successfully updated.")
-    #                             restart()
-                    
-
-    #             if correct_count != active_token_dict[ll_key]["count"]:
-                
-    #                 log.error(ll_key + " has count incorrectly set in SACCT database. Attempting to fix.")
-    #                 if fix_slurm_count:
-    #                     try:
-    #                         __update_token_count()
-    #                     except Exception as details:
-    #                         log.error("Failed to update SLURM token: " + str(details))
-    #                         log.info("Disabling licence " + ll_key + ".")
-
-    #                         ll_value["enabled"]=False
-    #                         ll_value["server_status"]="WRONG_TOKEN"
-    #                         continue
-    #                     else:
-    #                         log.info("SLURM token successfully updated.")
-    #                         restart()
-
-                
-    #             if active_token_dict[ll_key]["count"]==0:
-    #                 ll_value["enabled"]=False
-    #                 ll_value["server_status"]="ZERO_TOKEN"
-
-    #                 log.error(ll_key + " has 0 tokens in slurm db. Disabling.")
-    #                 continue
-
-
-    #             if active_token_dict[ll_key]["share_total"]<95:
-    #                 log.warning("'" + ll_key + "' SLURM share only adds up to " + str(active_token_dict[ll_key]["share_total"]) + '?? (This could be due to a cluster being disabled)')
-    #                 # else:
-    #                 #     If total on licence server does not match total slurm tokens, update slurm tokens.
-    #                 #     if ll_value["real_total"] != int(active_token_dict[key][3])/2 and ll_value["real_total"]!=0:
-    #                 #         log.error("SLURM TOKEN BAD, HAS " + str(int(active_token_dict[key][3])/2)  + " and should be " + str(ll_value["total"]))
-    #                 #         if slurm_permissions=="operator" or slurm_permissions=="administrator":
-    #                 #             try:
-    #                 #                 sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"].lower() + " Server=" + ll_value["server_name"].lower() + " set Count=" + str(int(ll_value["real_total"]*2))
-    #                 #                 log.debug(sub_input)
-    #                 #                 subprocess.check_output(sub_input, shell=True)        
-    #                 #             except Exception as details:
-    #                 #                 log.error(details)
-    #                 #             else:
-    #                 #                 log.warning("Token modified successfully!")
-    #                 #         else:
-    #                 #             log.error("User does not have required SLURM permissions to fix SLURM tokens totals.")
-
-    #                 #     if active_token_dict[key][7] != "50":
-    #                 #         log.error("SLURM token not cluster-split")
-    #                 #         if slurm_permissions=="operator" or slurm_permissions=="administrator":
-    #                 #             try:
-    #                 #                 sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"].lower() + " Server=" + ll_value["server_name"] + " percentallocated=100 where cluster=mahuika" +  " set PercentAllowed=50"
-    #                 #                 log.debug(sub_input)
-    #                 #                 subprocess.check_output(sub_input, shell=True)
-
-    #                 #                 sub_input="sacctmgr -i modify resource Name=" + ll_value["licence_name"].lower() + " Server=" + ll_value["server_name"] + " percentallocated=100 where cluster=maui" +  " set PercentAllowed=50"
-    #                 #                 log.debug(sub_input)
-    #                 #                 subprocess.check_output(sub_input, shell=True)
-    #                 #             except Exception as details:
-    #                 #                 log.error(details)
-    #                 #             else:
-    #                 #                 log.info("Token modified successfully!")
-    #                 #         else:
-    #                 #             log.error("User does not have required SLURM permissions to fix SLURM tokens.")
-
-    # def _clusters(ll_key, ll_value, module_list):
-    #     for module, module_value in module_list["modules"].items():
-    #         if ll_value["software_name"].lower() == module.lower():
-    #                 log.debug(ll_key +" exists as module")
-    #                 log.debug(",".join(module_value["machines"]))
-    #                 for cluster in module_value["machines"].keys():
-    #                     if cluster not in ll_value["clusters"]:
-    #                         ll_value["clusters"].append(cluster.lower())
-    #                         log.info(cluster.lower() + " added to " + ll_key)
-      
-    # log.info("Validating licence dictionary...")
-
-    # # Adds if licence exists in meta but not list
-    # for licence in licence_meta.keys():
-    #     if not licence in server_list:
-    #         log.warning(licence + " is new licence. Being added to database wih default ll_values.")
-    #         server_list[licence] = {}
-        
-    # for ll_key, ll_value in server_list.items():
-    #     # Unless specified 'active' and 'enabled' should always start as true.
-    #     ll_value["active"]=True
-    #     ll_value["enabled"]=True
-    #     ll_value["server_status"]="UNKNOWN"
-
-    #     # Add missing values   
-    #     for key in settings["default"].keys():
-    #         if key not in ll_value: #and key not in licence_meta[ll_key].keys():
-    #             ll_value[key] = settings["default"][key]
-    #             log.warning(str(ll_key) +  "  " + str(key) + " set to default value \"" + str(settings["default"][key]) + "\"")
-
-    #     # Remove extra values  
-    #     for key in list(ll_value):
-    #         if key not in settings["default"]:
-    #             log.warning("Removed defunct key '" + key + "' from something" )
-    #             ll_value.pop(key)
-
-    #     _clusters(ll_key, ll_value, module_list)
-    #     _fill(ll_key, ll_value)
-    #     _address(ll_key, ll_value)
-
-        # if not ll_value["licence_file_path"]:
-        #     log.error(key + " must have licence file path or address and port specified in order to check with LMUTIL SHOULDNT SEE THIS")
-        #     continue            
-        # if not ll_value["licence_feature_name"]: 
-        #     log.error(key + " must have feature specified in order to check with LMUTIL SHOULDNT SEE THIS")
-        #     continue
-        # if not ll_value["server_poll_method"] in poll_methods.keys(): 
-        #     log.error(key + " must have poll method specified in order to check with LMUTIL SHOULDNT SEE THIS")
-        #     continue
-        # if not ll_value["server_address"]: 
-        #     log.error(key + " must have address specified in order to check with LMUTIL SHOULDNT SEE THIS")
-        #     continue
-
-
-    #_tokens(server_list)
-
     c.writemake_json(settings["path_store"], server_list)  
 def get_slurm_permssions():
     try:
@@ -435,16 +146,17 @@ def get_nesi_use():
     # Build a string of all licences to check.
     all_licence_strings={}
 
-    for licence in server_list:
-        if "tracked_features" not in licence : continue # Skip if no features  
-        for feature in licence["tracked_features"].values():
+    for server in server_list:
+        if "tracked_features" not in server : continue # Skip if no features  
+        for feature in server["tracked_features"].values():
             if not feature["token_name"]: continue
             if not feature["enabled"]: continue
             for cluster in feature["clusters"]:
                 if cluster not in settings["clusters"].keys():  
                     log.error("No such cluster " + cluster)
                     continue
-                if cluster not in all_licence_strings.keys():
+                if cluster not in all_licence_strings:
+                    print(cluster)
                     all_licence_strings[cluster]=""
                 all_licence_strings[cluster]+=feature["token_name"] + ","
     log.debug(json.dumps(all_licence_strings))
@@ -507,7 +219,6 @@ def get_nesi_use():
                     for server in server_list:
                         # Added flag because cant break out of two loops         
                         for feature_name, feature_values in server["tracked_features"].items():
-                            print(feature_values["token_name"] + "   " + licence_token_name)
                             if feature_values["token_name"] == licence_token_name:
                                 
                                 feature_values["token_usage"]+=int(licence_token_count)
