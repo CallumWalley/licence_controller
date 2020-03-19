@@ -156,7 +156,6 @@ def get_nesi_use():
                     log.error("No such cluster " + cluster)
                     continue
                 if cluster not in all_licence_strings:
-                    print(cluster)
                     all_licence_strings[cluster]=""
                 all_licence_strings[cluster]+=feature["token_name"] + ","
     log.debug(json.dumps(all_licence_strings))
@@ -339,38 +338,36 @@ def poll_remote(server):
                         log.warning("Untracked feature: " + last_lic + " being used by " + group_dic["user"] + " on " + group_dic["host"])
 
         # Math
-        for tracked_feature_name, tracked_feature_values in server["tracked_features"].items():
-            # Do math    
-            log.info("Doing maths...")
-            hour_index = dt.datetime.now().hour - 1
+        # for tracked_feature_name, tracked_feature_values in server["tracked_features"].items():
+        #     # Do math    
+        #     log.info("Doing maths...")
+        #     hour_index = dt.datetime.now().hour - 1
 
-            # Find modified in use value
-            interesting = max(tracked_feature_values["history"])-tracked_feature_values["token_usage"]
+        #     # Find modified in use value
+        #     interesting = max(tracked_feature_values["history"])-tracked_feature_values["token_usage"]
 
-            if not tracked_feature_values['enabled']:
-                #tracked_feature_values["token_soak"]=tracked_feature_values["total"]
-                tracked_feature_values["token_soak"]="--"
-                log.warning("Unsoaking " + tracked_feature_name)
-            else:
-                tracked_feature_values["token_soak"] = int(min(
-                    max(interesting,0), tracked_feature_values["total"]
-                ))
+        #     if not tracked_feature_values['enabled']:
+        #         #tracked_feature_values["token_soak"]=tracked_feature_values["total"]
+        #         tracked_feature_values["token_soak"]="--"
+        #         log.warning("Unsoaking " + tracked_feature_name)
+        #     else:
+        #         tracked_feature_values["token_soak"] = int(min(
+        #             max(interesting,0), tracked_feature_values["total"]
+        #         ))
 
-            # Update average
-            tracked_feature_values["hourly_averages"][hour_index] = (
-                round(
-                    ((tracked_feature_values["usage_all"] * settings["point_weight"]) + (tracked_feature_values["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
-                    2,
-                )
-                if tracked_feature_values["hourly_averages"][hour_index]
-                else tracked_feature_values["usage_all"]
-            )
+        #     # Update average
+        #     tracked_feature_values["hourly_averages"][hour_index] = (
+        #         round(
+        #             ((tracked_feature_values["usage_all"] * settings["point_weight"]) + (tracked_feature_values["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
+        #             2,
+        #         )
+        #         if tracked_feature_values["hourly_averages"][hour_index]
+        #         else tracked_feature_values["usage_all"]
+        #     )
 
             # Promethius
-            if not "prometheus_gauge" in tracked_feature_values: continue
-            tracked_feature_values["prometheus_gauge"].set(tracked_feature_values["usage_all"])
-            # feature["usage_all"]=0
-            # feature["usage_nesi"]=0
+            # if not "prometheus_gauge" in tracked_feature_values: continue
+            # tracked_feature_values["prometheus_gauge"].set(tracked_feature_values["usage_all"])
 
 
     except Exception as details:
@@ -379,13 +376,7 @@ def poll_remote(server):
     else:
         c.writemake_json(settings["path_store"], server_list)  
         schedul.enter(server["server"]["poll_period"], 1, poll_remote, argument=(server,))
-        
-
-        # for feature_ll_value in ll_value["tokens"]:
-        #     feature_ll_value["last_poll"]=time.time()
-        #     do_maths(feature_ll_value)
-        #     if feature_ll_value["history"][-1] != feature_ll_value["real_usage_all"]:
-        #         apply_soak()                
+                   
 def apply_soak():
     
     def _do_maths(feature):
@@ -393,21 +384,21 @@ def apply_soak():
         log.info("Doing maths...")
         hour_index = dt.datetime.now().hour - 1
 
-        # Find modified in use value
-        interesting = max(feature["history"])-feature["token_usage"]
-
-        if not feature['enabled']:
-            feature["token_soak"]="--"
-            log.debug("Skipping  " + feature + " disabled")
-        else:
-            feature["token_soak"] = int(min(interesting + feature["buffer_constant"],  feature["total"]))
+        feature["history"].append(feature["usage_all"])
+        while len(feature["history"]) > settings["history_points"]:
+            feature["history"].pop(0)
 
         # Update average
         if feature["hourly_averages"][hour_index] :
             feature["hourly_averages"][hour_index] = round(((feature["usage_all"] * settings["point_weight"] ) + ( feature["hourly_averages"][hour_index] * (1 - settings["point_weight"]) )),2)
         else:
             feature["hourly_averages"][hour_index]=feature["usage_all"]
-        
+
+        if not feature['enabled']:
+            feature["token_soak"]="--"
+            log.debug("Skipping  " + feature + " disabled")
+        else:
+            feature["token_soak"] = int(min(max(max(feature["history"]), feature["usage_all"]) + feature["buffer_constant"],  feature["total"]))
     
     def _update_res(cluster, soak):
         log.info("Attempting to update " + cluster + " reservation.")
@@ -431,10 +422,13 @@ def apply_soak():
     res_update_strings={}
     for server in server_list: 
         for tracked_feature_name, tracked_feature_value in server["tracked_features"].items():
+            
             _do_maths(tracked_feature_value)
+
             if not tracked_feature_value['enabled']: continue
             if not tracked_feature_value['token_name']: continue
 
+            
             for cluster in tracked_feature_value["clusters"]:         
                 if tracked_feature_value["token_soak"]:
                     if cluster not in res_update_strings:
@@ -489,7 +483,11 @@ def print_panel():
 
         for feature_key, feature_value in server["tracked_features"].items():
             try:
-                dashboard+=("|" + " "*19 + "L" + fit_2_col(feature_key,20) + "|" + fit_2_col(feature_value["total"],9) + "|" + fit_2_col(feature_value["hourly_averages"][hour_index]) + "|"  + fit_2_col(feature_value["usage_all"]) + "|" + fit_2_col(feature_value["usage_nesi"]) + "|" + fit_2_col(feature_value["token_usage"]) + "|" + fit_2_col(feature_value["token_soak"]) + "|                                                      |\n")
+                if feature_value["buffer_constant"]>1:
+                    buffer_note=" ((" + str(feature_value["buffer_constant"]) + "))"
+                else:
+                    buffer_note=""
+                dashboard+=("|" + " "*19 + "L" + fit_2_col(feature_key,20) + "|" + fit_2_col(feature_value["total"],9) + "|" + fit_2_col(feature_value["hourly_averages"][hour_index]) + "|"  + fit_2_col(feature_value["usage_all"]) + "|" + fit_2_col(feature_value["usage_nesi"]) + "|" + fit_2_col(feature_value["token_usage"]) + "|" + fit_2_col(str(feature_value["token_soak"])+buffer_note) + "|                                                      |\n")
                 if feature_value["usage_nesi"]:
                     for user, usage in feature_value["users_nesi"].items():
                         dashboard+=("|" + " "*29 + "L" + fit_2_col(user,10) + "|         |             |             |" + fit_2_col(usage["count"]) + "|" + fit_2_col(usage["tokens"]) + "|" + fit_2_col(usage["tokens"]) + "|" + fit_2_col(",".join(usage["sockets"]),54) + "|\n")
