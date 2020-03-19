@@ -1,5 +1,6 @@
 import math, os, stat, re, json, logging, time, subprocess, sys, traceback, curses, sched
 import datetime as dt
+from clog import log
 
 import common as c
 from copy import deepcopy
@@ -432,18 +433,24 @@ def get_nesi_use():
     log.info("Checking NeSI tokens... (period " + str(settings["squeue_poll_period"]) + "s)")
     
     # Build a string of all licences to check.
-    all_licence_string=""
+    all_licence_string={}
 
     for licence in server_list:
-        if "tracked_features" not in licence:
-            # Skip if no features
-            continue
-        for feature in licence["tracked_features"].keys():
-            all_licence_string+=feature["token_name"] + ","
-
+        if "tracked_features" not in licence : continue # Skip if no features  
+        for feature in licence["tracked_features"].values():
+            if not feature["token_name"]: continue
+            if not feature["enabled"]: continue
+            for cluster in feature["clusters"]:
+                if cluster not in settings["clusters"].keys():  
+                    log.error("No such cluster " + cluster)
+                    continue
+                if cluster not in all_licence_string:
+                    all_licence_string[cluster]=""
+                all_licence_string[cluster]+=feature["token_name"] + ","
+    log.debug(json.dumps(all_licence_string))
     # Return if nothing to check.
-    if not all_licence_string:
-        return
+    if not all_licence_string: return
+
     # "clusters":{
     #     "mahuika":{
     #         "enabled":true
@@ -455,11 +462,12 @@ def get_nesi_use():
     # }
     # For each cluster
     for cluster, status in settings["clusters"].items():
+
         if not "enabled" in status or not status["enabled"]:
             log.info("Skipping cluster " + cluster + " disabled or missing details.")
             continue
         # Search squeue for running or pending jobs
-        sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_string
+        sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_string[cluster]
         
         #licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
         log.debug(sub_input)
@@ -479,70 +487,48 @@ def get_nesi_use():
             scontrol_string_list=scontrol_string.split('\n')
             scontrol_string_list.pop(0) # First Line is bleh
 
-            try:
-                for line in scontrol_string_list:
-                    log.debug(line)
-                    if len(line)<6:
+            #try:
+            for line in scontrol_string_list:
+                log.debug(line)
+                if len(line)<6:
+                    continue
+                line_delimited=line.split('|')
+                username=line_delimited[0]
+                licences_per_user=line_delimited[6].split(',')
+                # User may have multiple licences. Proccess for each.
+                for licence_token in licences_per_user:
+                    if not licence_token:
                         continue
-                    line_delimited=line.split('|')
-                    username=line_delimited[0]
-                    licences_per_user=line_delimited[6].split(',')
-                    # User may have multiple licences. Proccess for each.
-                    for licence_token in licences_per_user:
-                        if not licence_token:
-                            continue
 
-                        licence_token_name=licence_token.split(':')[0]
-                        licence_token_count = licence_token.split(':')[1] if len(licence_token.split(':'))>1 else 1
+                    licence_token_name=licence_token.split(':')[0]
+                    licence_token_count = licence_token.split(':')[1] if len(licence_token.split(':'))>1 else 1
 
-                        for licence in server_list:
-                            for feature, feature_values in licence["tracked_features"].items():
-                                if feature['token_name'] == licence_token_name:
-                                    feature["token_usage"]+=int(licence_token_count)
-                                    if username not in feature["users_nesi"]:
-                                        server_list[licence_token_name]["users_nesi"][username]={"count":0, "tokens":0, "sockets":[]}
+                    found=False
+                    for server in server_list:
+                        # Added flag because cant break out of two loops         
+                        for feature_name, feature_values in server["tracked_features"].items():
+                            print(feature_values["token_name"] + "   " + licence_token_name)
+                            if feature_values["token_name"] == licence_token_name:
+                                
+                                feature_values["token_usage"]+=int(licence_token_count)
+                                if username not in feature_values["users_nesi"]:
+                                    feature_values["users_nesi"][username]={"count":0, "tokens":0, "sockets":[], "soak":0}
 
-                                    server_list[licence_token_name]["users_nesi"][username]["count"]+=int(licence_token_count)
-                                else:
-                                    continue
-                            
-
-                        else:
-                            log.error("Licence " + licence_token_name + " does not exist in licence controller.")
-                            log.info("Empty licence " + licence_token_name + " added to meta.")
-                            ##licence_meta[licence_token_name]={}
-                            #restart()
-            except Exception as e:
-                log.error(str(e))
+                                feature_values["users_nesi"][username]["tokens"]+=int(licence_token_count)
+                                feature_values["users_nesi"][username]-=int(licence_token_count)
+                                found=True
+                            if found: break       
+                        if found: break 
+                    else:
+                        log.error("Licence " + licence_token_name + " does not exist in licence controller.")
+                        log.info("Empty licence " + licence_token_name + " added to meta.")
+                        ##licence_meta[licence_token_name]={}
+                        #restart()
+            #except Exception as e:
+                # print(e)
+                # log.error(str(e))
         schedul.enter(max(settings["squeue_poll_period"],5), 1, get_nesi_use)   
-def do_maths(value):
-    
-    log.info("Doing maths...")
-    hour_index = dt.datetime.now().hour - 1
 
-    if not value['enabled']:
-        return
-
-    # Find modified in use value
-    interesting = max(value["history"])-value["token_usage"]
-
-    if not value['active']:
-        value["token_soak"]=value["real_total"]
-        log.warning("Fully soaking " + value)
-    else:
-        value["token_soak"] = int(min(
-            max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
-        ))
-
-    # Update average
-    value["hourly_averages"][hour_index] = (
-        round(
-            ((value["real_usage_all"] * settings["point_weight"]) + (value["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
-            2,
-        )
-        if value["hourly_averages"][hour_index]
-        else value["real_usage_all"]
-    )
 def poll_remote(server):
     # Skip if disabled or non existant.
     
@@ -630,10 +616,11 @@ def poll_remote(server):
                     if match_cluster:
                         # If user not already. Add them.
                         if group_dic["user"] not in last_lic["users_nesi"]:
-                            last_lic["users_nesi"][group_dic["user"]]={"count":0, "tokens":0, "sockets":[]}
+                            last_lic["users_nesi"][group_dic["user"]]={"count":0, "tokens":0, "sockets":[], "soak":0}
 
                         last_lic["usage_nesi"]+=lic_count
                         last_lic["users_nesi"][group_dic["user"]]["count"]+=lic_count
+                        last_lic["users_nesi"][group_dic["user"]]["soak"]+=lic_count
                         last_lic["users_nesi"][group_dic["user"]]["sockets"].append(match_cluster.group(0))                 
                 else:
                     if match_cluster:
@@ -649,8 +636,9 @@ def poll_remote(server):
             interesting = max(tracked_feature_values["history"])-tracked_feature_values["token_usage"]
 
             if not tracked_feature_values['enabled']:
-                tracked_feature_values["token_soak"]=tracked_feature_values["total"]
-                log.warning("Fully soaking " + tracked_feature_values["token_name"])
+                #tracked_feature_values["token_soak"]=tracked_feature_values["total"]
+                tracked_feature_values["token_soak"]=0
+                log.warning("Unsoaking " + tracked_feature_name)
             else:
                 tracked_feature_values["token_soak"] = int(min(
                     max(interesting,0), tracked_feature_values["total"]
@@ -687,7 +675,33 @@ def poll_remote(server):
         #     if feature_ll_value["history"][-1] != feature_ll_value["real_usage_all"]:
         #         apply_soak()                
 def apply_soak():
+    
+    def _do_maths(value):
+        
+        log.info("Doing maths...")
+        hour_index = dt.datetime.now().hour - 1
 
+        # Find modified in use value
+        interesting = max(value["history"])-value["token_usage"]
+
+        if not value['active']:
+            value["token_soak"]=value["real_total"]
+            log.warning("Fully soaking " + value)
+        else:
+            value["token_soak"] = int(min(
+                max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
+            ))
+
+        # Update average
+        value["hourly_averages"][hour_index] = (
+            round(
+                ((value["real_usage_all"] * settings["point_weight"]) + (value["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
+                2,
+            )
+            if value["hourly_averages"][hour_index]
+            else value["real_usage_all"]
+        )
+    
     def _update_res(cluster, soak):
         log.info("Attempting to update " + cluster + " reservation.")
 
@@ -708,28 +722,28 @@ def apply_soak():
     res_name = "licence_soak"
 
     res_update_strings={}
-    for ll_key, ll_value in server_list.items():
-        if not ll_value['enabled']:
-            continue
+    for server in server_list: 
+        for tracked_feature_name, tracked_feature_value in server["tracked_features"].items():
 
-        for cluster in ll_value["clusters"]:
+            if not tracked_feature_value['enabled']: continue
+            if not tracked_feature_value['token_name']: continue
 
-            if cluster not in res_update_strings:
+            for cluster in tracked_feature_value["clusters"]:
 
-                res_update_strings[cluster] =  " licenses="
-            
-            if ll_value["token_soak"]:
-                res_update_strings[cluster] += ll_key + ":" + str(ll_value["token_soak"]) + ","    
+                if cluster not in res_update_strings:
 
-    log.debug("Contructing reservation strings")
-    log.debug(json.dumps(res_update_strings))
+                    res_update_strings[cluster] =  " licenses="
+                
+                if tracked_feature_value["token_soak"]:
+
+                    res_update_strings[cluster] += tracked_feature_value['token_name'] + ":" + str(tracked_feature_value["token_soak"]) + ","    
+
+        log.debug("Contructing reservation strings")
+        log.debug(json.dumps(res_update_strings))
 
     for cluster, soak in res_update_strings.items():
         if cluster not in settings["clusters"].keys() or "enabled" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["enabled"]:
             log.warning("Skipping licence soak on " + cluster)
-            continue
-        if last_update[cluster]==soak:
-            log.info("skipping soak. No change.")
             continue
         try:
             _update_res(cluster, soak)
@@ -745,6 +759,8 @@ def apply_soak():
                 log.info("New reservation '" + res_name + "' created successfully.")
         else:
             log.info( cluster + " reservation updated successfully!")
+
+    schedul.enter(settings["squeue_poll_period"], 1, apply_soak)
 #def promethisise():
     # for monitor in monitors:
     #         next(monitor)
@@ -773,7 +789,7 @@ def print_panel():
                 dashboard+=("|" + " "*19 + "L" + fit_2_col(feature_key,20) + "|" + fit_2_col(feature_value["total"],9) + "|" + fit_2_col(feature_value["hourly_averages"][hour_index]) + "|"  + fit_2_col(feature_value["usage_all"]) + "|" + fit_2_col(feature_value["usage_nesi"]) + "|" + fit_2_col(feature_value["token_usage"]) + "|" + fit_2_col(feature_value["token_soak"]) + "|                                                      |\n")
                 if feature_value["usage_nesi"]:
                     for user, usage in feature_value["users_nesi"].items():
-                        dashboard+=("|" + " "*29 + "L" + fit_2_col(user,10) + "|         |             |             |" + fit_2_col(usage["count"]) + "|" + fit_2_col(usage["tokens"]) + "|             |" + fit_2_col(",".join(usage["sockets"]),54) + "|\n")
+                        dashboard+=("|" + " "*29 + "L" + fit_2_col(user,10) + "|         |             |             |" + fit_2_col(usage["count"]) + "|" + fit_2_col(usage["tokens"]) + "|" + fit_2_col(usage["tokens"]) + "|" + fit_2_col(",".join(usage["sockets"]),54) + "|\n")
             except Exception as details: log.error("Wonky line in dashboard " + str(type(details)) + " " + str(details))
             
     dashboard+=("O========================================^=========^=============^=============^=============^=============^=============^======================================================O\n")
@@ -786,12 +802,6 @@ def print_panel():
 
 settings = c.readmake_json("settings.json")
 module_list = c.readmake_json(settings["path_modulelist"])
-
-
-
-# Try import logger
-sys.path.append(os.path.abspath(settings["path_logger"]))
-from error_handle import log
 
 # Is correct user
 if os.environ["USER"] != settings["user"] and not os.environ.get("CHECKUSER","").lower()=="false":
@@ -841,7 +851,8 @@ validate()
 schedul = sched.scheduler(time.time, time.sleep)
 for server in server_list:    
     poll_remote(server)
-#get_nesi_use() 
+get_nesi_use() 
+apply_soak()
 print_panel()           
 
 # Will run as long as items scehudelddeld
