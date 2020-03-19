@@ -306,7 +306,7 @@ def poll_remote(server):
                 else:
                     server["untracked_features"].append(group_dic["feature"])
                     last_lic=group_dic["feature"]
-                    log.warning(group_dic["feature"] + " being added to untracked features.")
+                    log.info("'" + group_dic["feature"] + "' being added to untracked features.")
 
             elif last_lic == None: continue # If not feature header we dont care.
 
@@ -484,13 +484,13 @@ def print_panel():
         for feature_key, feature_value in server["tracked_features"].items():
             try:
                 if feature_value["buffer_constant"]>1:
-                    buffer_note=" ((" + str(feature_value["buffer_constant"]) + "))"
+                    buffer_note=" (" + str(feature_value["buffer_constant"]) + ")"
                 else:
                     buffer_note=""
                 dashboard+=("|" + " "*19 + "L" + fit_2_col(feature_key,20) + "|" + fit_2_col(feature_value["total"],9) + "|" + fit_2_col(feature_value["hourly_averages"][hour_index]) + "|"  + fit_2_col(feature_value["usage_all"]) + "|" + fit_2_col(feature_value["usage_nesi"]) + "|" + fit_2_col(feature_value["token_usage"]) + "|" + fit_2_col(str(feature_value["token_soak"])+buffer_note) + "|                                                      |\n")
                 if feature_value["usage_nesi"]:
                     for user, usage in feature_value["users_nesi"].items():
-                        dashboard+=("|" + " "*29 + "L" + fit_2_col(user,10) + "|         |             |             |" + fit_2_col(usage["count"]) + "|" + fit_2_col(usage["tokens"]) + "|" + fit_2_col(usage["tokens"]) + "|" + fit_2_col(",".join(usage["sockets"]),54) + "|\n")
+                        dashboard+=("|" + " "*29 + "L" + fit_2_col(user,10) + "|         |             |             |" + fit_2_col(usage["count"]) + "|" + fit_2_col(usage["tokens"]) + "|" + fit_2_col(usage["soak"]) + "|" + fit_2_col(",".join(usage["sockets"]),54) + "|\n")
             except Exception as details: log.error("Wonky line in dashboard " + str(type(details)) + " " + str(details))
             
     dashboard+=("O========================================^=========^=============^=============^=============^=============^=============^======================================================O\n")
