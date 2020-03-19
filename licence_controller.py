@@ -20,8 +20,8 @@ from prometheus_client import start_http_server, Gauge
 # server_pattern=<pattern applied to get global server properties>
 
 
-# 'enabled' = If 'false' licence server will not be checked, reservation will not be updated. Toggled off if licence is lacking required property.
-# 'active' = If false 'soak' will be set to 'total'. toggled off if licence server cannnot be reached during runtime.
+# 'enabled' = Whether slurm db is to be contacted.
+# 'active' = Whether remote server should be contacted.
 
 
 # Identifies whether NeSI host.
@@ -90,7 +90,7 @@ def validate():
                         feature_values[key]=value
                 # Notify if no cluster set
                 if feature_values["enabled"] and feature_values["token_name"] and len(feature_values["clusters"])<1:
-                    log.warning(feature + " is enabled, has a token name, but is not assigned any cluster")
+                    log.warning(feature_values["token_name"] + " is enabled, but is not assigned any cluster")
 
             statdat = os.stat(server["licence_file"]["path"])
             file_name = server["licence_file"]["path"].split("/")[-1]
@@ -388,31 +388,26 @@ def poll_remote(server):
         #         apply_soak()                
 def apply_soak():
     
-    def _do_maths(value):
+    def _do_maths(feature):
         
         log.info("Doing maths...")
         hour_index = dt.datetime.now().hour - 1
 
         # Find modified in use value
-        interesting = max(value["history"])-value["token_usage"]
+        interesting = max(feature["history"])-feature["token_usage"]
 
-        if not value['active']:
-            value["token_soak"]=value["real_total"]
-            log.warning("Fully soaking " + value)
+        if not feature['enabled']:
+            feature["token_soak"]="--"
+            log.debug("Skipping  " + feature + " disabled")
         else:
-            value["token_soak"] = int(min(
-                max(interesting + value["buffer_constant"], interesting * (1 + value["buffer_factor"]),0), value["real_total"]
-            ))
+            feature["token_soak"] = int(min(interesting + feature["buffer_constant"],  feature["total"]))
 
         # Update average
-        value["hourly_averages"][hour_index] = (
-            round(
-                ((value["real_usage_all"] * settings["point_weight"]) + (value["hourly_averages"][hour_index] * (1 - settings["point_weight"]))),
-                2,
-            )
-            if value["hourly_averages"][hour_index]
-            else value["real_usage_all"]
-        )
+        if feature["hourly_averages"][hour_index] :
+            feature["hourly_averages"][hour_index] = round(((feature["usage_all"] * settings["point_weight"] ) + ( feature["hourly_averages"][hour_index] * (1 - settings["point_weight"]) )),2)
+        else:
+            feature["hourly_averages"][hour_index]=feature["usage_all"]
+        
     
     def _update_res(cluster, soak):
         log.info("Attempting to update " + cluster + " reservation.")
@@ -436,7 +431,7 @@ def apply_soak():
     res_update_strings={}
     for server in server_list: 
         for tracked_feature_name, tracked_feature_value in server["tracked_features"].items():
-
+            _do_maths(tracked_feature_value)
             if not tracked_feature_value['enabled']: continue
             if not tracked_feature_value['token_name']: continue
 
@@ -552,12 +547,11 @@ else:
 
 # Promethius Monitors
 monitors=[]
-
-
 validate()
 
 schedul = sched.scheduler(time.time, time.sleep)
 for server in server_list:    
+
     poll_remote(server)
 get_nesi_use() 
 apply_soak()
@@ -565,44 +559,3 @@ print_panel()
 
 # Will run as long as items scehudelddeld
 schedul.run()
-# while 1:
-#     looptime = time.time()
-#     try:
-#         main()
-#     except Exception as details:
-#         print(sys.exc_info())
-#         log.error("Main loop failed: " + str(details))
-
-    #log.info("main loop time = " + str(time.time() - looptime))
-    #time.sleep(max(settings["poll_period"] - (time.time() - looptime), 0))
-
-    # for key, ll_value in server_list.items():
-    # hour_index = dt.datetime.now().hour - 1
-    # ll_value["in_use_real"] = int(feature["in_use_real"])
-
-    # if ll_value["total"] != int(feature["total"]):
-    #     log.warning("LMUTIL shows different total number of licences than recorded. Changing from '" + str(ll_value["total"]) + "' to '" + feature["total"] + "'")
-    #     ll_value["total"] = int(feature["total"])
-
-    # # Record to running history
-    # ll_value["history"].append(ll_value["in_use_real"])
-
-    # # Pop extra array entries
-    # while len(ll_value["history"]) > ll_value["history_points"]:
-    #     ll_value["history"].pop(0)
-
-    # # Find modified in use ll_value
-    # interesting = max(ll_value["history"])-ll_value["in_use_nesi"]
-    # ll_value["soak"] = round(min(
-    #     max(interesting + ll_value["buffer_constant"], interesting * (1 + ll_value["buffer_factor"]),0), ll_value["total"]
-    # ))
-
-    # # Update average
-    # ll_value["day_ave"][hour_index] = (
-    #     round(
-    #         ((ll_value["in_use_real"] * settings["point_weight"]) + (ll_value["day_ave"][hour_index] * (1 - settings["point_weight"]))),
-    #         2,
-    #     )
-    #     if ll_value["day_ave"][hour_index]
-    #     else ll_value["in_use_real"]
-    # )
