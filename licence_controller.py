@@ -433,7 +433,7 @@ def get_nesi_use():
     log.info("Checking NeSI tokens... (period " + str(settings["squeue_poll_period"]) + "s)")
     
     # Build a string of all licences to check.
-    all_licence_string={}
+    all_licence_strings={}
 
     for licence in server_list:
         if "tracked_features" not in licence : continue # Skip if no features  
@@ -444,12 +444,12 @@ def get_nesi_use():
                 if cluster not in settings["clusters"].keys():  
                     log.error("No such cluster " + cluster)
                     continue
-                if cluster not in all_licence_string:
-                    all_licence_string[cluster]=""
-                all_licence_string[cluster]+=feature["token_name"] + ","
-    log.debug(json.dumps(all_licence_string))
+                if cluster not in all_licence_strings.keys():
+                    all_licence_strings[cluster]=""
+                all_licence_strings[cluster]+=feature["token_name"] + ","
+    log.debug(json.dumps(all_licence_strings))
     # Return if nothing to check.
-    if not all_licence_string: return
+    if not all_licence_strings: return
 
     # "clusters":{
     #     "mahuika":{
@@ -467,7 +467,7 @@ def get_nesi_use():
             log.info("Skipping cluster " + cluster + " disabled or missing details.")
             continue
         # Search squeue for running or pending jobs
-        sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_string[cluster]
+        sub_input = "squeue -h -M " + cluster + " --format=\"%u|%C|%t|%r|%S|%N|%W\" -L " + all_licence_strings[cluster]
         
         #licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
         log.debug(sub_input)
@@ -638,7 +638,7 @@ def poll_remote(server):
 
             if not tracked_feature_values['enabled']:
                 #tracked_feature_values["token_soak"]=tracked_feature_values["total"]
-                tracked_feature_values["token_soak"]=0
+                tracked_feature_values["token_soak"]="--"
                 log.warning("Unsoaking " + tracked_feature_name)
             else:
                 tracked_feature_values["token_soak"] = int(min(
