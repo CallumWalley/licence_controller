@@ -335,7 +335,7 @@ def poll_remote(server):
                         last_lic["users_nesi"][group_dic["user"]]["sockets"].append(match_cluster.group(0))                 
                 else:
                     if match_cluster:
-                        log.warning("Untracked feature: " + last_lic + " being used by " + group_dic["user"] + " on " + group_dic["host"])
+                        log.info("Untracked feature: " + last_lic + " being used by " + group_dic["user"] + " on " + group_dic["host"])
 
         # Math
         # for tracked_feature_name, tracked_feature_values in server["tracked_features"].items():
