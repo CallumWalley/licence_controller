@@ -340,15 +340,12 @@ def poll_remote(server):
                 elif group_dic["feature"] in server["untracked_features"]:
                     last_lic = group_dic["feature"]
                     log.debug(group_dic["feature"] + " is untracked feature")
-                    continue
                 else:
                     server["untracked_features"].append(group_dic["feature"])
                     last_lic = group_dic["feature"]
                     log.info("'" + group_dic["feature"] + "' being added to untracked features.")
-
-            elif last_lic is not None:
-                continue  # If not feature header we dont care.
-
+                continue
+            
             # If this is the case, it is a user.
             if group_dic["user"] is not None:
                 log.debug(group_dic["user"] + " is a user")
