@@ -323,7 +323,7 @@ def poll_remote(server):
         # Read regex by line.
         for featureorline in featureanduser_re_match:
             group_dic = featureorline.groupdict()
-
+            log.debug(json.dumps(group_dic))
             tracked = False
             # If this is the case, it is a feature header.
             if group_dic["feature"] is not None:
@@ -437,8 +437,10 @@ def apply_soak():
             _do_maths(tracked_feature_value)
 
             if not tracked_feature_value["slurm_active"]:
+                log.debug(tracked_feature_name + "not slurm_active. Skipping...")
                 continue
             if not tracked_feature_value["token_name"]:
+                log.debug(tracked_feature_name + "has no token name. Skipping...")
                 continue
 
             for cluster in tracked_feature_value["clusters"]:
