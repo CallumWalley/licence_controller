@@ -28,9 +28,10 @@ from clog import log
 # licence_pattern=<pattern applied to extract indiviudal licence users>
 # server_pattern=<pattern applied to get global server properties>
 
-# 'enabled' = Whether slurm db is to be contacted.
-# 'active' = Whether remote server should be contacted.
-# 'visible' = Whether licence should appear in documentation.
+# 'slurm_active' = Whether slurm db is to be contacted.
+# 'polling_server' = Whether remote server should be contacted.
+# 'visible_on_docs' = Whether licence should appear in documentation.
+# 'slurm_blocked' = will set soak to 100%, preventing all programs running.
 
 # Identifies whether NeSI host.
 cluster_pattern = re.compile(r".*mahuika.*|.*maui.*|.*lander.*|.*nesi.*|wbn\d{3}|wcl\d{3}|vgpuwbg\d{3}|wbl\d{3}|wbh\d{3}|nid00\d{3}|wsn\d{3}|vgpuwsg\d{3}", flags=re.I)
@@ -117,8 +118,8 @@ def validate():
                         log.info(feature + " missing property '" + key + "'. Setting to default.")
                         feature_values[key] = value
                 # Notify if no cluster set
-                if feature_values["enabled"] and feature_values["token_name"] and len(feature_values["clusters"]) < 1:
-                    log.warning(feature_values["token_name"] + " is enabled, but is not assigned any cluster")
+                if feature_values["slurm_active"] and feature_values["token_name"] and len(feature_values["clusters"]) < 1:
+                    log.warning(feature_values["token_name"] + " is slurm_active, but is not assigned any cluster")
 
             statdat = os.stat(server["licence_file"]["path"])
             file_name = server["licence_file"]["path"].split("/")[-1]
@@ -152,7 +153,7 @@ def validate():
                     log.warning(file_name + " port mismatch: " + server["server"]["port"] + " -> " + match_address["server_port"])
         except Exception as details:
             log.error("'" + server["licence_file"]["path"] + " has an invalid file path attached: " + str(details))
-            server["server"]["active"] = False
+            server["server"]["polling_server"] = False
             server["server"]["status"] = "INVALID"
 
     writemake_json(settings["path_store"], server_list)
@@ -183,7 +184,7 @@ def get_nesi_use():
         for feature in server["tracked_features"].values():
             if not feature["token_name"]:
                 continue
-            if not feature["enabled"]:
+            if not feature["slurm_active"]:
                 continue
             for cluster in feature["clusters"]:
                 if cluster not in settings["clusters"].keys():
@@ -199,7 +200,7 @@ def get_nesi_use():
 
     # "clusters":{
     #     "mahuika":{
-    #         "enabled":true
+    #         "slurm_active":true
     #     },
     #     "maui":{
 
@@ -209,7 +210,7 @@ def get_nesi_use():
     # For each cluster
     for cluster, status in settings["clusters"].items():
 
-        if "enabled" not in status or not status["enabled"]:
+        if "slurm_active" not in status or not status["slurm_active"]:
             log.info("Skipping cluster " + cluster + " disabled or missing details.")
             continue
         # Search squeue for running or pending jobs
@@ -262,7 +263,7 @@ def get_nesi_use():
                                     feature_values["users_nesi"][username] = {"count": 0, "tokens": 0, "sockets": [], "soak": 0}
 
                                 feature_values["users_nesi"][username]["tokens"] += int(licence_token_count)
-                                feature_values["users_nesi"][username] -= int(licence_token_count)
+                                feature_values["users_nesi"][username]["soak"] -= int(licence_token_count)
                                 found = True
                             if found:
                                 break
@@ -276,12 +277,12 @@ def get_nesi_use():
 
 def poll_remote(server):
     # Skip if disabled or non existant.
-    if "server" not in server or "active" not in server["server"]:
+    if "server" not in server or "polling_server" not in server["server"]:
         log.warning("Skipping " + server["server"]["address"] + " as invalid details.")
         server["server"] = settings["default"]["server"]
         server["server"]["status"] = "INVALID"
         return
-    if not server["server"]["active"]:
+    if not server["server"]["polling_server"]:
         log.info("Skipping server " + server["server"]["address"] + " as disabled.")
         server["server"]["status"] = "DISABLED"
         return
@@ -401,7 +402,7 @@ def apply_soak():
         else:
             feature["hourly_averages"][hour_index] = feature["usage_all"]
 
-        if not feature["enabled"]:
+        if not feature["slurm_active"]:
             feature["token_soak"] = "--"
             log.debug("Skipping  " + feature + " disabled")
         else:
@@ -432,7 +433,7 @@ def apply_soak():
 
             _do_maths(tracked_feature_value)
 
-            if not tracked_feature_value["enabled"]:
+            if not tracked_feature_value["slurm_active"]:
                 continue
             if not tracked_feature_value["token_name"]:
                 continue
@@ -447,7 +448,7 @@ def apply_soak():
         log.debug(json.dumps(res_update_strings))
 
     for cluster, soak in res_update_strings.items():
-        if cluster not in settings["clusters"].keys() or "enabled" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["enabled"]:
+        if cluster not in settings["clusters"].keys() or "slurm_active" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["slurm_active"]:
             log.warning("Skipping licence soak on " + cluster)
             continue
         try:
@@ -486,7 +487,7 @@ def print_panel():
     dashboard += "|          Server/Feature/User           |  Status | Average Use | In Use All  | In Use NeSI |  Token Use  |     Soak    |                        Sockets                       |\n"
 
     for server in server_list:
-        if "tracked_features" not in server or "server" not in server or "active" not in server["server"] or not server["server"]["active"]:
+        if "tracked_features" not in server or "server" not in server or "polling_server" not in server["server"] or not server["server"]["polling_server"]:
             continue
         dashboard += "O========================================+=========+=============+=============+=============+=============+=============+======================================================O\n"
         dashboard += (
