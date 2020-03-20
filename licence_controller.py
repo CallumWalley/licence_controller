@@ -276,6 +276,7 @@ def get_nesi_use():
 
 
 def poll_remote(server):
+
     # Skip if disabled or non existant.
     if "server" not in server or "polling_server" not in server["server"]:
         log.warning("Skipping " + server["server"]["address"] + " as invalid details.")
@@ -326,7 +327,6 @@ def poll_remote(server):
             tracked = False
             # If this is the case, it is a feature header.
             if group_dic["feature"] is not None:
-                last_lic = group_dic
                 if group_dic["feature"] in server["tracked_features"].keys():
                     log.debug(group_dic["feature"] + " is tracked feature")
                     # Last_lic points to the licecne objects.
@@ -385,6 +385,7 @@ def poll_remote(server):
         writemake_json(settings["path_store"], server_list)
         schedul.enter(server["server"]["poll_period"], 1, poll_remote, argument=(server,))
 
+    log.debug(json.dumps(server))
 
 def apply_soak():
     def _do_maths(feature):
