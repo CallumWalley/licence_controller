@@ -324,9 +324,10 @@ def poll_remote(server):
         for featureorline in featureanduser_re_match:
             group_dic = featureorline.groupdict()
             log.debug(json.dumps(group_dic))
-            tracked = False
+            
             # If this is the case, it is a feature header.
             if group_dic["feature"] is not None:
+                tracked = False
                 if group_dic["feature"] in server["tracked_features"].keys():
                     log.debug(group_dic["feature"] + " is tracked feature")
                     # Last_lic points to the licecne objects.
@@ -345,12 +346,11 @@ def poll_remote(server):
                     last_lic = group_dic["feature"]
                     log.info("'" + group_dic["feature"] + "' being added to untracked features.")
                 continue
-            
+
             # If this is the case, it is a user.
             if group_dic["user"] is not None:
                 log.debug(group_dic["user"] + " is a user")
                 match_cluster = cluster_pattern.match(group_dic["host"])
-                
                 if tracked:
                     # Count gets added regardless of socket
                     if "count" in group_dic and group_dic["count"].isdigit():
@@ -375,7 +375,7 @@ def poll_remote(server):
                         log.info("Untracked feature: " + last_lic + " being used by " + group_dic["user"] + " on " + group_dic["host"])
 
     except Exception as details:
-        log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " " + str(details))
+        log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " ")
         server["server"]["status"] = "DOWN"
     else:
         writemake_json(settings["path_store"], server_list)
