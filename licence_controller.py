@@ -184,7 +184,7 @@ def get_nesi_use():
         for feature in server["tracked_features"].values():
             if not feature["token_name"]:
                 continue
-            if not feature["enabled"]:
+            if not feature["slurm_active"]:
                 continue
             for cluster in feature["clusters"]:
                 if cluster not in settings["clusters"].keys():
