@@ -184,7 +184,7 @@ def get_nesi_use():
         for feature in server["tracked_features"].values():
             if not feature["token_name"]:
                 continue
-            if not feature["slurm_active"]:
+            if not feature["enabled"]:
                 continue
             for cluster in feature["clusters"]:
                 if cluster not in settings["clusters"].keys():
@@ -323,10 +323,10 @@ def poll_remote(server):
         for featureorline in featureanduser_re_match:
             group_dic = featureorline.groupdict()
 
+            tracked = False
             # If this is the case, it is a feature header.
             if group_dic["feature"] is not None:
                 last_lic = group_dic
-                tracked = False
                 if group_dic["feature"] in server["tracked_features"].keys():
                     log.debug(group_dic["feature"] + " is tracked feature")
                     # Last_lic points to the licecne objects.
@@ -348,6 +348,8 @@ def poll_remote(server):
 
             elif last_lic is not None:
                 continue  # If not feature header we dont care.
+            else:
+                log.warning("Licence server has no features")
 
             # If this is the case, it is a user.
             if group_dic["user"] is not None:
@@ -433,7 +435,7 @@ def apply_soak():
 
             _do_maths(tracked_feature_value)
 
-            if not tracked_feature_value["slurm_active"]:
+            if not tracked_feature_value["enabled"]:
                 continue
             if not tracked_feature_value["token_name"]:
                 continue
