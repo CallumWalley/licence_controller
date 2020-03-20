@@ -324,10 +324,9 @@ def poll_remote(server):
         for featureorline in featureanduser_re_match:
             group_dic = featureorline.groupdict()
             log.debug(json.dumps(group_dic))
+            tracked = False
             # If this is the case, it is a feature header.
             if group_dic["feature"] is not None:
-                tracked = False
-
                 if group_dic["feature"] in server["tracked_features"].keys():
                     log.debug(group_dic["feature"] + " is tracked feature")
                     # Last_lic points to the licecne objects.
@@ -349,8 +348,6 @@ def poll_remote(server):
 
             elif last_lic is not None:
                 continue  # If not feature header we dont care.
-            else:
-                log.warning("Licence server has no features")
 
             # If this is the case, it is a user.
             if group_dic["user"] is not None:
