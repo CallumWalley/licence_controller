@@ -210,7 +210,7 @@ def get_nesi_use():
     # For each cluster
     for cluster, status in settings["clusters"].items():
 
-        if "slurm_active" not in status or not status["slurm_active"]:
+        if "enabled" not in status or not status["enabled"]:
             log.info("Skipping cluster " + cluster + " disabled or missing details.")
             continue
         # Search squeue for running or pending jobs
@@ -435,7 +435,7 @@ def apply_soak():
 
             _do_maths(tracked_feature_value)
 
-            if not tracked_feature_value["enabled"]:
+            if not tracked_feature_value["slurm_active"]:
                 continue
             if not tracked_feature_value["token_name"]:
                 continue
@@ -450,7 +450,7 @@ def apply_soak():
         log.debug(json.dumps(res_update_strings))
 
     for cluster, soak in res_update_strings.items():
-        if cluster not in settings["clusters"].keys() or "slurm_active" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["slurm_active"]:
+        if cluster not in settings["clusters"].keys() or "enabled" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["enabled"]:
             log.warning("Skipping licence soak on " + cluster)
             continue
         try:
