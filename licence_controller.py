@@ -216,7 +216,7 @@ def get_nesi_use():
             log.info("Skipping cluster " + cluster + " disabled or missing details.")
             continue
         # Search squeue for running or pending jobs
-        sub_input = "squeue -h -M " + cluster + ' --format="%u|%C|%t|%r|%S|%N|%W" -L ' + all_licence_strings[cluster]
+        sub_input = "squeue -h -M " + cluster + ' --format="%u|%C|%t|%r|%S|%N|%W" -t R -L ' + all_licence_strings[cluster]
 
         # licence_pattern=re.compile(r"\s*(?P<username>\S*)\s*(?P<socket>\S*)\s*.*\), start (?P<datestr>.*?:.{2}).?\s?(?P<count>\d)?.*")
         log.debug(sub_input)
@@ -280,7 +280,7 @@ def get_nesi_use():
 def poll_remote(server):
 
     # Skip if disabled or non existant.
-    tic=time.time()
+    tic = time.time()
     if "server" not in server or "polling_server" not in server["server"]:
         log.warning("Skipping " + server["server"]["address"] + " as invalid details.")
         server["server"] = settings["default"]["server"]
