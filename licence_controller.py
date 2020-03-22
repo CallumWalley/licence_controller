@@ -50,7 +50,7 @@ poll_methods = {
     "lmutil": {
         "shell_command": "linx64/lmutil lmstat -a -c %(path)s",
         "licence_pattern": re.compile(
-            r"^(Users of )*(?P<feature>\S+):  \(Total of (?P<total>\d+).*|\n*^\s*(?P<user>\S*)\s*(?P<host>\S*).*\s(?P<date>\d+\/\d+)\s(?P<time>[\d\:]+).*$", flags=re.M
+            r"^(Users of )*(?P<feature>\S+):  \(Total of (?P<total>\d+).*|\n*^\s*(?P<user>\S*)\s*(?P<host>\S*).*\s(?P<date>\d+\/\d+)\s(?P<time>[\d\:]+)\D*(?P<count>\d*).*$", flags=re.M
         ),
         "feature_pattern": "",
         "server_pattern": re.compile(r"^.* license server (?P<last_stat>.*) v(?P<version>.*)$", flags=re.M),
@@ -322,6 +322,7 @@ def poll_remote(server):
             tracked_feature["users_nesi"] = {}
 
         last_lic = None
+        tracked = False
         # Read regex by line.
         for featureorline in featureanduser_re_match:
             group_dic = featureorline.groupdict()
