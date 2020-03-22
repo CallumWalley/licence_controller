@@ -8,6 +8,7 @@ import sched
 import subprocess
 import time
 import sys
+import traceback
 from grp import getgrgid
 from pwd import getpwuid
 
@@ -376,7 +377,8 @@ def poll_remote(server):
 
         server["server"]["poll_time"] = (time.time()-tic)
     except Exception as details:
-        log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " ")
+        log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " \n" + traceback.format_exc())
+        log.error()
         server["server"]["status"] = "DOWN"
     else:
         writemake_json(settings["path_store"], all_server_list)
