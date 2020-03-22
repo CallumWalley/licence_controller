@@ -327,7 +327,6 @@ def poll_remote(server):
             group_dic = featureorline.groupdict()
             log.debug(json.dumps(group_dic))       
             # If this is the case, it is a feature header.
-            tracked = False
             if group_dic["feature"] is not None:
                 if group_dic["feature"] in server["tracked_features"].keys():
                     log.debug(group_dic["feature"] + " is tracked feature")
@@ -342,10 +341,12 @@ def poll_remote(server):
                 elif group_dic["feature"] in server["untracked_features"]:
                     last_lic = group_dic["feature"]
                     log.debug(group_dic["feature"] + " is untracked feature")
+                    tracked = False
                 else:
                     server["untracked_features"].append(group_dic["feature"])
                     last_lic = group_dic["feature"]
                     log.info("'" + group_dic["feature"] + "' being added to untracked features.")
+                    tracked = False
                 continue
 
             # If this is the case, it is a user.
