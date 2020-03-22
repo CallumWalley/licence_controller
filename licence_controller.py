@@ -279,6 +279,7 @@ def get_nesi_use():
 def poll_remote(server):
 
     # Skip if disabled or non existant.
+    tic=time.time()
     if "server" not in server or "polling_server" not in server["server"]:
         log.warning("Skipping " + server["server"]["address"] + " as invalid details.")
         server["server"] = settings["default"]["server"]
@@ -289,6 +290,7 @@ def poll_remote(server):
         server["server"]["status"] = "DISABLED"
         return
     try:
+        tic = time.time()
         server["server"]["status"] = "UNKNOWN"
         log.info("Checking Licence Server at '" + server["server"]["address"] + "'... (period " + str(server["server"]["poll_period"]) + "s)")
         shell_command_string = poll_methods[server["server"]["poll_method"]]["shell_command"] % server["licence_file"]
@@ -372,6 +374,7 @@ def poll_remote(server):
                     if match_cluster:
                         log.info("Untracked feature: " + last_lic + " being used by " + group_dic["user"] + " on " + group_dic["host"])
 
+        server["server"]["poll_time"] = (time.time()-tic)
     except Exception as details:
         log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " ")
         server["server"]["status"] = "DOWN"
@@ -582,12 +585,13 @@ if sys.argv[0] == os.path.basename(__file__):
 if len(sys.argv) > 0:
     name_list = ""
     for arg in sys.argv:
+        found = False
         for server in all_server_list:
             if arg.strip() == server["software_name"]:
                 server_list.append(server)
                 name_list += server["software_name"] + ","
-                break
-        else:
+                found = True
+        if not found:
             print("No such software '" + arg + "'")
     if len(server_list) < 1:
         raise Exception("Not enough valid input arguments given.")
