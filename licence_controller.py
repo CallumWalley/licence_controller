@@ -327,8 +327,8 @@ def poll_remote(server):
             group_dic = featureorline.groupdict()
             log.debug(json.dumps(group_dic))       
             # If this is the case, it is a feature header.
+            tracked = False
             if group_dic["feature"] is not None:
-                tracked = False
                 if group_dic["feature"] in server["tracked_features"].keys():
                     log.debug(group_dic["feature"] + " is tracked feature")
                     # Last_lic points to the licecne objects.
@@ -378,7 +378,6 @@ def poll_remote(server):
         server["server"]["poll_time"] = (time.time()-tic)
     except Exception as details:
         log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " \n" + traceback.format_exc())
-        log.error()
         server["server"]["status"] = "DOWN"
     else:
         writemake_json(settings["path_store"], all_server_list)
