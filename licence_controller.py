@@ -373,7 +373,8 @@ def poll_remote(server):
                         last_lic["users_nesi"][group_dic["user"]]["sockets"].append(match_cluster.group(0))
                 else:
                     if match_cluster:
-                        log.info("Untracked feature: " + last_lic + " being used by " + group_dic["user"] + " on " + group_dic["host"])
+                        thing=1
+                        #log.info("Untracked feature: " + last_lic + " being used by " + group_dic["user"] + " on " + group_dic["host"])
 
         server["server"]["poll_time"] = (time.time()-tic)
     except Exception as details:
