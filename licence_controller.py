@@ -7,6 +7,7 @@ import re
 import sched
 import subprocess
 import time
+import sys
 from grp import getgrgid
 from pwd import getpwuid
 
@@ -74,7 +75,7 @@ def readmake_json(path, default={}):
 
 def writemake_json(path, outject):
     with open(path, "w+") as json_file:
-        json_file.write(json.dumps(outject))
+        json_file.write(json.dumps(outject, indent=4, sort_keys=True))
         log.info(path + " updated")
 
 
@@ -156,7 +157,7 @@ def validate():
             server["server"]["polling_server"] = False
             server["server"]["status"] = "INVALID"
 
-    writemake_json(settings["path_store"], server_list)
+    writemake_json(settings["path_store"], all_server_list)
 
 
 def get_slurm_permssions():
@@ -301,7 +302,6 @@ def poll_remote(server):
             return
 
         server_re_match_group = server_re_match.groupdict()
-        log.debug(json.dumps(server_re_match_group))
 
         server["server"]["status"] = server_re_match_group["last_stat"]
         server["server"]["version"] = server_re_match_group["version"]
@@ -319,12 +319,10 @@ def poll_remote(server):
             tracked_feature["users_nesi"] = {}
 
         last_lic = None
-
         # Read regex by line.
         for featureorline in featureanduser_re_match:
             group_dic = featureorline.groupdict()
-            log.debug(json.dumps(group_dic))
-            
+            log.debug(json.dumps(group_dic))       
             # If this is the case, it is a feature header.
             if group_dic["feature"] is not None:
                 tracked = False
@@ -378,7 +376,7 @@ def poll_remote(server):
         log.error("Failed to check '" + server["server"]["address"] + "': " + str(type(details)) + " ")
         server["server"]["status"] = "DOWN"
     else:
-        writemake_json(settings["path_store"], server_list)
+        writemake_json(settings["path_store"], all_server_list)
         schedul.enter(server["server"]["poll_period"], 1, poll_remote, argument=(server,))
 
     log.debug(json.dumps(server))
@@ -574,9 +572,31 @@ slurm_permissions = get_slurm_permssions()
 log.debug(json.dumps(settings))
 
 
-server_list = readmake_json(settings["path_store"])
+all_server_list = readmake_json(settings["path_store"])
 
+server_list = []
 
+if sys.argv[0] == os.path.basename(__file__):
+    sys.argv.pop(0)
+
+if len(sys.argv) > 0:
+    name_list = ""
+    for arg in sys.argv:
+        for server in all_server_list:
+            if arg.strip() == server["software_name"]:
+                server_list.append(server)
+                name_list += server["software_name"] + ","
+                break
+        else:
+            print("No such software '" + arg + "'")
+    if len(server_list) < 1:
+        raise Exception("Not enough valid input arguments given.")
+    else:
+        log.info("Only checking servers for " + name_list[:-1])
+        log.info("Setting 'SOAK=FALSE'")
+        os.environ["SOAK"] = "FALSE"
+else:
+    server_list = all_server_list
 # Start prom server
 try:
     start_http_server(settings["prom_port"])
