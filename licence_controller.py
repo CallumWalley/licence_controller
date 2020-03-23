@@ -507,7 +507,7 @@ def apply_soak():
 
     for cluster, soak in res_update_strings.items():
         if cluster not in settings["clusters"].keys() or "enabled" not in settings["clusters"][cluster].keys() or not settings["clusters"][cluster]["enabled"]:
-            log.warning("Skipping licence soak on " + cluster)
+            log.info("Skipping licence soak on " + cluster)
             continue
         try:
             _update_res(cluster, soak)
