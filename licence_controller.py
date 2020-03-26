@@ -312,7 +312,7 @@ def poll_remote(server):
             # Read regex by line.
             for featureorline in featureanduser_re_match:
                 group_dic = featureorline.groupdict()
-                log.debug(json.dumps(group_dic))       
+                log.debug(json.dumps(group_dic))
                 # If this is the case, it is a feature header.
                 if group_dic["feature"] is not None:
                     if group_dic["feature"] in server["tracked_features"].keys():
@@ -365,22 +365,21 @@ def poll_remote(server):
 
     def ansysli_util():
         log.info("Checking Licence Server at '" + server["server"]["address"] + "'... (period " + str(server["server"]["poll_period"]) + "s)")
-        shell_command_string = "export ANSYSLMD_LICENSE_FILE=$(head -n 1 " + server["licence_file"]["path"] + " | sed -n -e 's/.*=//p');linx64/ansysli_util -printavail"
+        shell_command_string = "export ANSYSLMD_LICENSE_FILE=$(head -n 1 " + server["licence_file"]["path"] + " | sed -n -e 's/.*=//p');linx64/ansysli_util -liusage"
         log.debug(shell_command_string)
         sub_return = subprocess.check_output(shell_command_string, shell=True).strip().decode("utf-8", "replace")  # Removed .decode("utf-8") as threw error.
         log.debug(sub_return)
 
         coarce_pattern=re.compile(r"FEATURENAME: (?P<feature>\S*)\n.*\n.*\n.*\n.*COUNT: (?P<total>\d*)\n.*USED: (?P<count>\d*)", flags=re.M)
-
+        fine_pattern = re.compile(r"(?P<user>[A-Za-z0-9]*)@(?P<host>\S*):\d*\s*(?P<date>[\d\/]*?) (?P<time>[\d\:]*)\s*(?P<feature>[a-zA-Z_]*)?[^\d]*(?P<count>\d*){1}\s*(?P<version>\S*)", flags=re.M)
 
         #datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         server["server"]["status"] = "UP" #server_re_match_group["last_stat"]
         server["server"]["version"] = ""
         #log.info("'" + server["server"]["address"] + "' " + server_re_match_group["last_stat"])
-
         # server["server"]["last_time"]=server_re_match_group["last_time"]
 
-        featureanduser_re_match = coarce_pattern.finditer(sub_return)
+        featureanduser_re_match = fine_pattern.finditer(sub_return)
         if len(server["tracked_features"].keys()) < 1:
             log.warning("No features are being tracked on " + server["server"]["address"])
         # Clear previous totals
@@ -389,29 +388,67 @@ def poll_remote(server):
             tracked_feature["usage_nesi"] = 0
             tracked_feature["users_nesi"] = {}
 
-
-        #shell_command_string = "export ANSYSLMD_LICENSE_FILE=$(head -n 1 " + server["licence_file"]["path"] + " | sed -n -e 's/.*=//p');linx64/ansysli_util -liusage"
-
-        # Read regex by line.
+        # fine
+        #Frst is bleh
         for featureorline in featureanduser_re_match:
             group_dic = featureorline.groupdict()
-            log.debug(json.dumps(group_dic))
+            if not group_dic["feature"] or not group_dic["user"]:
+                continue
             # If this is the case, it is a feature header.
-            if group_dic["feature"] is not None:
-                if group_dic["feature"] in server["tracked_features"].keys():
-                    log.debug(group_dic["feature"] + " is tracked feature")
-                    # Last_lic points to the licecne objects.
+            match_cluster = cluster_pattern.match(group_dic["host"])
+            log.debug(json.dumps(group_dic))
 
-                    if server["tracked_features"][group_dic["feature"]]["total"] != int(group_dic["total"]):
-                        log.warning("total was " + str(group_dic["total"]) + " at last count, now " + str(group_dic["total"]))
-                        server["tracked_features"][group_dic["feature"]]["total"] = int(group_dic["total"])                   
-                    server["tracked_features"][group_dic["feature"]]["usage_all"] = int(group_dic["count"])
+            if group_dic["feature"] in server["tracked_features"].keys():
 
-                elif group_dic["feature"] in server["untracked_features"]:
-                    log.debug(group_dic["feature"] + " is untracked feature")
+                log.debug(group_dic["feature"] + " is tracked feature")
+                # Count gets added regardless of socket
+                if "count" in group_dic and group_dic["count"].isdigit():
+                    lic_count = int(group_dic["count"])
                 else:
-                    server["untracked_features"].append(group_dic["feature"])
-                    log.info("'" + group_dic["feature"] + "' being added to untracked features.")
+                    lic_count = 1
+
+                server["tracked_features"][group_dic["feature"]]["usage_all"] += lic_count
+
+                # Count gets added regardless of socket
+                if match_cluster:
+                    log.debug(group_dic["user"] + " is a user")
+                    # If user not already. Add them.
+                    if group_dic["user"] not in server["tracked_features"][group_dic["feature"]]["users_nesi"]:
+                        server["tracked_features"][group_dic["feature"]]["users_nesi"][group_dic["user"]] = {"count": 0, "tokens": 0, "sockets": [], "soak": 0}
+
+                    server["tracked_features"][group_dic["feature"]]["usage_nesi"] += lic_count
+                    server["tracked_features"][group_dic["feature"]]["users_nesi"][group_dic["user"]]["count"] += lic_count
+                    server["tracked_features"][group_dic["feature"]]["users_nesi"][group_dic["user"]]["sockets"].append(match_cluster.group(0))
+            elif match_cluster:
+                log.info("Untracked feature: " + group_dic["feature"] + " being used by " + group_dic["user"] + " on " + group_dic["host"])
+            elif group_dic["feature"] in server["untracked_features"]:
+                log.debug(group_dic["feature"] + " is untracked feature")
+            else:
+                server["untracked_features"].append(group_dic["feature"])
+                log.info("'" + group_dic["feature"] + "' being added to untracked features.")
+
+        #shell_command_string = "export ANSYSLMD_LICENSE_FILE=$(head -n 1 " + server["licence_file"]["path"] + " | sed -n -e 's/.*=//p');linx64/ansysli_util -liusage"
+        # Read regex by line.
+        # Coarse
+        # for featureorline in featureanduser_re_match:
+        #     group_dic = featureorline.groupdict()
+        #     log.debug(json.dumps(group_dic))
+        #     # If this is the case, it is a feature header.
+        #     if group_dic["feature"] is not None:
+        #         if group_dic["feature"] in server["tracked_features"].keys():
+        #             log.debug(group_dic["feature"] + " is tracked feature")
+        #             # Last_lic points to the licecne objects.
+
+        #             if server["tracked_features"][group_dic["feature"]]["total"] != int(group_dic["total"]):
+        #                 log.warning("total was " + str(group_dic["total"]) + " at last count, now " + str(group_dic["total"]))
+        #                 server["tracked_features"][group_dic["feature"]]["total"] = int(group_dic["total"])                   
+        #             server["tracked_features"][group_dic["feature"]]["usage_all"] = int(group_dic["count"])
+
+        #         elif group_dic["feature"] in server["untracked_features"]:
+        #             log.debug(group_dic["feature"] + " is untracked feature")
+        #         else:
+        #             server["untracked_features"].append(group_dic["feature"])
+        #             log.info("'" + group_dic["feature"] + "' being added to untracked features.")
 
     # Skip if disabled or non existant.
     tic = time.time()
