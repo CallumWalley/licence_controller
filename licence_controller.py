@@ -108,9 +108,10 @@ def validate():
 
     # Check resources recorded in sacctmgr
     lic_ar={}
-    for line in ex_slurm_command("sacctmgr show resource withclusters -n -p").strip().split("\n"):
+    for line in ex_slurm_command("sacctmgr show resource withclusters -n -p", "operator").strip().split("\n"):
         ls = line.split("|")
         lic_ar[ls[0] + "@" + ls[1]] = ls
+
 
     for server in server_list:
         try:
