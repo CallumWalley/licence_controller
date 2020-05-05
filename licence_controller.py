@@ -126,14 +126,14 @@ def validate():
                     feature_values[key] = value
 
             # Compare with existing Tokens                        
-            clusters = feature["clusters"].copy()
-            num_clust=len(feature["clusters"])
-            meta_total=num_clust * feature["total"]
+            clusters = feature_values["clusters"].copy()
+            num_clust=len(feature_values["clusters"])
+            meta_total=num_clust * feature_values["total"]
             fraction = int(100 / num_clust)
             
             for token, values in lic_ar.items():
                 # List of clusters, remove once checked.           
-                if token == feature["token_name"]:
+                if token == feature_values["token_name"]:
 
                     if values[3] != meta_total:
                         log.warning(token + " on " + values[6] + " has metatotal of " + str(values[3]) + " should have " + str(meta_total))
