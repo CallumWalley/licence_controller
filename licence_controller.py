@@ -122,7 +122,10 @@ def validate():
                 if key not in feature_values:
                     log.info(feature + " missing property '" + key + "'. Setting to default.")
                     feature_values[key] = value
-
+                    
+            # Copy dict name to value for backward comp.
+            if not feature_values["feature_name"]:
+                feature_values["feature_name"]=feature
             # Compare with existing Tokens                        
             clusters = feature_values["clusters"].copy()
             num_clust=len(feature_values["clusters"])
@@ -151,7 +154,7 @@ def validate():
 
             if clusters:
                 for cluster in clusters:
-                    srmcmd="sacctmgr add resource -i Name=" + values[0] + " Server=" + values[1] + " Clusters=" + cluster + " Count=" + str(meta_total) + " PercentAllowed=" + str(fraction)
+                    srmcmd="sacctmgr add resource -i Type=License Name=" + values[0] + " Server=" + values[1] + " Clusters=" + cluster + " Count=" + str(meta_total) + " PercentAllowed=" + str(fraction)
                     log.error(srmcmd)
                     #ex_slurm_command(srmcmd)
 
@@ -214,6 +217,7 @@ def get_slurm_permssions():
         log.info("User SLURM permissions are '" + lmutil_return + "'")
 
         return lmutil_return
+
 
 def get_nesi_use():
     log.info("Checking NeSI tokens... (period " + str(settings["squeue_poll_period"]) + "s)")
@@ -519,6 +523,7 @@ def poll_remote(server):
 
     log.debug(json.dumps(server))
 
+
 def apply_soak():
     def _do_maths(feature):
 
@@ -539,7 +544,7 @@ def apply_soak():
 
         if not feature["slurm_active"]:
             feature["token_soak"] = "--"
-            log.debug("Skipping  " + feature + " disabled")
+            log.debug("Skipping  " + feature["feature_name"] + " disabled")
         else:
             feature["token_soak"] = int(min(max(max(feature["history"]), feature["usage_all"]) + feature["buffer_constant"], feature["total"]))
 
@@ -605,10 +610,9 @@ def apply_soak():
 
     schedul.enter(settings["squeue_poll_period"], 1, apply_soak)
 
-
 # def promethisise():
 # for monitor in monitors:
-#         next(monitor)
+# next(monitor)
 def print_panel():
     def fit_2_col(inval, colsize=13):
         """Trims whatever value input to colsize and centres it"""
@@ -687,7 +691,6 @@ def print_panel():
     # main_dashboard.addstr(1,0,dashboard)
     print(dashboard)
     schedul.enter(settings["redraw_dash_period"], 1, print_panel)
-
 
 settings = readmake_json("settings.json")
 module_list = readmake_json(settings["path_modulelist"])
