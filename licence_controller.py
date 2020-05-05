@@ -86,7 +86,7 @@ def ex_slurm_command(sub_input, level="administrator"):
         try:
             output = subprocess.check_output(sub_input, shell=True).decode("utf-8")
         except Exception as details:
-            raise Exception("Failed to execute SLURM command '" + sub_input + "':" + str(details))
+            log.error("Failed to execute SLURM command '" + sub_input + "':" + str(details))
         else:
             log.debug("Success!")
             time.sleep(5)  # Avoid spamming database
@@ -94,9 +94,7 @@ def ex_slurm_command(sub_input, level="administrator"):
     else:
         with open("run_as_admin.sh", "a+") as f:
             f.write(sub_input + "\n")
-        log.error("Writing command to 'run_as_admin.sh'")
-
-        raise Exception("User does not have appropriate SLURM permissions to run this command.")
+        log.error("User does not have appropriate SLURM permissions to run this command. Writing command to 'run_as_admin.sh'")
 
 
 def validate():
