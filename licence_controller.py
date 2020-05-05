@@ -135,12 +135,12 @@ def validate():
 
                     if int(values[3]) != meta_total:
                         log.warning(token + " on " + values[6] + " has metatotal of " + str(values[3]) + " should have " + str(meta_total))
-                        srmcmd="sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + " Set Count=" + str(meta_total)
+                        srmcmd="sacctmgr modify resource -i Name=" + values[0] + " Server=" + values[1] + " Set Count=" + str(meta_total)
                         log.error(srmcmd)
                         ex_slurm_command(srmcmd)
                     if int(values[4]) != fraction:
                         log.warning(token + " on " + values[6] + " has fraction of " + str(values[4]) + " should have " + str(fraction))
-                        srmcmd="sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + " Clusters=" + values[6] + " Set PercentAllowed=" + str(fraction)
+                        srmcmd="sacctmgr modify resource -i Name=" + values[0] + " Server=" + values[1] + " Clusters=" + values[6] + " Set PercentAllowed=" + str(fraction)
                         log.error(srmcmd)
                         ex_slurm_command(srmcmd)
                     # If token from cluster not in list.
@@ -151,7 +151,7 @@ def validate():
 
             if clusters:
                 for cluster in clusters:
-                    srmcmd="sacctmgr add resource Name=" + values[0] + " Server=" + values[1] + "Clusters=" + cluster + " Count=" + str(meta_total) + " PercentAllowed=" + str(fraction)
+                    srmcmd="sacctmgr add resource -i Name=" + values[0] + " Server=" + values[1] + " Clusters=" + cluster + " Count=" + str(meta_total) + " PercentAllowed=" + str(fraction)
                     log.error(srmcmd)
                     ex_slurm_command(srmcmd)
 
