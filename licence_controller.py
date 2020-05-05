@@ -130,7 +130,7 @@ def validate():
                 feature_values["feature_name"]=feature
             # Compare with existing Tokens                        
             clusters = feature_values["clusters"].copy()
-            num_clust=len(feature_values["clusters"])
+            num_clust=max(len(feature_values["clusters"]),1)
             meta_total=math.ceil(feature_values["total"] / int(1/num_clust))
             fraction = int(100 / num_clust)
             
