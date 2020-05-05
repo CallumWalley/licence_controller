@@ -130,9 +130,11 @@ def validate():
                 feature_values["feature_name"]=feature
             # Compare with existing Tokens                        
             clusters = feature_values["clusters"].copy()
-            num_clust=max(len(feature_values["clusters"]),1)
-            meta_total=math.ceil(feature_values["total"] / int(1/num_clust))
+            num_clust=max(len(feature_values["clusters"]), 1)
             fraction = int(100 / num_clust)
+            # 'total * clusters' IS NOT THE SAME AS 'total / (1/clusters)'
+            meta_total=math.ceil(feature_values["total"]/(fraction/100))
+            
             
             for token, values in lic_ar.items():
                 # List of clusters, remove once checked.           
