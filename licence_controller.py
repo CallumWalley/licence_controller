@@ -153,7 +153,7 @@ def validate():
                 for cluster in clusters:
                     srmcmd="sacctmgr add resource -i Name=" + values[0] + " Server=" + values[1] + " Clusters=" + cluster + " Count=" + str(meta_total) + " PercentAllowed=" + str(fraction)
                     log.error(srmcmd)
-                    ex_slurm_command(srmcmd)
+                    #ex_slurm_command(srmcmd)
 
             # if not feature_values["token_name"]:
             #     log.info(feature + " missing property '" + key + "'. Setting to default.")
