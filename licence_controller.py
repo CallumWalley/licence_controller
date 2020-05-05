@@ -92,7 +92,6 @@ def ex_slurm_command(sub_input, level="administrator"):
             time.sleep(5)  # Avoid spamming database
             return output
     else:
-
         with open("run_as_admin.sh", "a+") as f:
             f.write(sub_input + "\n")
         log.error("Writing command to 'run_as_admin.sh'")
@@ -107,6 +106,12 @@ def validate():
         log.info("Skipping validation")
         return
 
+    # Check resources recorded in sacctmgr
+    lic_ar={}
+    for line in ex_slurm_command("sacctmgr show resource withclusters -n -p").strip().split("\n"):
+        ls = line.split("|")
+        lic_ar[ls[0] + "@" + ls[1]] = ls
+
     for server in server_list:
         try:
             for key, value in settings["default_server"].items():
@@ -119,6 +124,42 @@ def validate():
                     if key not in feature_values:
                         log.info(feature + " missing property '" + key + "'. Setting to default.")
                         feature_values[key] = value
+
+                # Compare with existing Tokens                        
+                clusters = feature["clusters"].copy()
+                num_clust=len(feature["clusters"])
+                meta_total=num_clust * feature["total"]
+                fraction = int(100 / num_clust)
+                
+                for token, values in lic_ar.items():
+                    # List of clusters, remove once checked.           
+                    if token == feature["token_name"]:
+
+                        if values[3] != meta_total:
+                            log.warning(token + " on " + values[6] + " has metatotal of " + str(values[3]) + " should have " + str(meta_total))
+                            log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + " Count=" + str(meta_total))
+
+                        if values[4] != fraction:
+                            log.warning(token + " on " + values[6] + " has fraction of " + str(values[4]) + " should have " + str(fraction))
+                            log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + "Clusters=" + values[6] + " PercentAllowed=" + str(fraction))
+
+                        # If token from cluster not in list.
+                        if values[6] not in clusters:
+                            log.warning("slurm licence token assigned on cluster " + values[6] + " but not in licence controller")
+                            break
+                        clusters.remove(values[6])
+
+                if clusters:
+                    for cluster in clusters:
+                        log.error("sacctmgr add resource Name=" + values[0] + " Server=" + values[1] + "Clusters=" + cluster + " Count=" + str(meta_total) + " PercentAllowed=" + str(fraction))
+
+
+                # if not feature_values["token_name"]:
+                #     log.info(feature + " missing property '" + key + "'. Setting to default.")
+                #     srvname=server["institution"]
+                #     if server["faculty"]
+                #     feature_values["token_name"]= feature.lower() + "@" + "faculty" "institution": "cwal219",
+
                 # Notify if no cluster set
                 if feature_values["slurm_active"] and feature_values["token_name"] and len(feature_values["clusters"]) < 1:
                     log.warning(feature_values["token_name"] + " is slurm_active, but is not assigned any cluster")
@@ -173,7 +214,6 @@ def get_slurm_permssions():
 
         return lmutil_return
 
-
 def get_nesi_use():
     log.info("Checking NeSI tokens... (period " + str(settings["squeue_poll_period"]) + "s)")
 
@@ -210,6 +250,7 @@ def get_nesi_use():
     #     "maui_ancil":{}
     # }
     # For each cluster
+
     for cluster, status in settings["clusters"].items():
 
         if "enabled" not in status or not status["enabled"]:
@@ -662,11 +703,8 @@ log.info("Starting...")
 slurm_permissions = get_slurm_permssions()
 
 # An error will be thrown if reservation is updated without change.
-
-
 # Settings need to be fixed
 log.debug(json.dumps(settings))
-
 
 all_server_list = readmake_json(settings["path_store"])
 
