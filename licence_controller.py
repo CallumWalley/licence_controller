@@ -112,93 +112,92 @@ def validate():
         ls = line.split("|")
         lic_ar[ls[0] + "@" + ls[1]] = ls
 
-
     for server in server_list:
-        try:
-            for key, value in settings["default_server"].items():
-                if key not in server:
-                    log.info(str(server) + " missing property '" + key + "'. Setting to default.")
-                    server[key] = value
+        # try:
+        for key, value in settings["default_server"].items():
+            if key not in server:
+                log.info(str(server) + " missing property '" + key + "'. Setting to default.")
+                server[key] = value
 
-            for feature, feature_values in server["tracked_features"].items():
-                for key, value in settings["default_feature"].items():
-                    if key not in feature_values:
-                        log.info(feature + " missing property '" + key + "'. Setting to default.")
-                        feature_values[key] = value
+        for feature, feature_values in server["tracked_features"].items():
+            for key, value in settings["default_feature"].items():
+                if key not in feature_values:
+                    log.info(feature + " missing property '" + key + "'. Setting to default.")
+                    feature_values[key] = value
 
-                # Compare with existing Tokens                        
-                clusters = feature["clusters"].copy()
-                num_clust=len(feature["clusters"])
-                meta_total=num_clust * feature["total"]
-                fraction = int(100 / num_clust)
-                
-                for token, values in lic_ar.items():
-                    # List of clusters, remove once checked.           
-                    if token == feature["token_name"]:
+            # Compare with existing Tokens                        
+            clusters = feature["clusters"].copy()
+            num_clust=len(feature["clusters"])
+            meta_total=num_clust * feature["total"]
+            fraction = int(100 / num_clust)
+            
+            for token, values in lic_ar.items():
+                # List of clusters, remove once checked.           
+                if token == feature["token_name"]:
 
-                        if values[3] != meta_total:
-                            log.warning(token + " on " + values[6] + " has metatotal of " + str(values[3]) + " should have " + str(meta_total))
-                            log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + " Count=" + str(meta_total))
+                    if values[3] != meta_total:
+                        log.warning(token + " on " + values[6] + " has metatotal of " + str(values[3]) + " should have " + str(meta_total))
+                        log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + " Count=" + str(meta_total))
 
-                        if values[4] != fraction:
-                            log.warning(token + " on " + values[6] + " has fraction of " + str(values[4]) + " should have " + str(fraction))
-                            log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + "Clusters=" + values[6] + " PercentAllowed=" + str(fraction))
+                    if values[4] != fraction:
+                        log.warning(token + " on " + values[6] + " has fraction of " + str(values[4]) + " should have " + str(fraction))
+                        log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + "Clusters=" + values[6] + " PercentAllowed=" + str(fraction))
 
-                        # If token from cluster not in list.
-                        if values[6] not in clusters:
-                            log.warning("slurm licence token assigned on cluster " + values[6] + " but not in licence controller")
-                            break
-                        clusters.remove(values[6])
+                    # If token from cluster not in list.
+                    if values[6] not in clusters:
+                        log.warning("slurm licence token assigned on cluster " + values[6] + " but not in licence controller")
+                        break
+                    clusters.remove(values[6])
 
-                if clusters:
-                    for cluster in clusters:
-                        log.error("sacctmgr add resource Name=" + values[0] + " Server=" + values[1] + "Clusters=" + cluster + " Count=" + str(meta_total) + " PercentAllowed=" + str(fraction))
+            if clusters:
+                for cluster in clusters:
+                    log.error("sacctmgr add resource Name=" + values[0] + " Server=" + values[1] + "Clusters=" + cluster + " Count=" + str(meta_total) + " PercentAllowed=" + str(fraction))
 
 
-                # if not feature_values["token_name"]:
-                #     log.info(feature + " missing property '" + key + "'. Setting to default.")
-                #     srvname=server["institution"]
-                #     if server["faculty"]
-                #     feature_values["token_name"]= feature.lower() + "@" + "faculty" "institution": "cwal219",
+            # if not feature_values["token_name"]:
+            #     log.info(feature + " missing property '" + key + "'. Setting to default.")
+            #     srvname=server["institution"]
+            #     if server["faculty"]
+            #     feature_values["token_name"]= feature.lower() + "@" + "faculty" "institution": "cwal219",
 
-                # Notify if no cluster set
-                if feature_values["slurm_active"] and feature_values["token_name"] and len(feature_values["clusters"]) < 1:
-                    log.warning(feature_values["token_name"] + " is slurm_active, but is not assigned any cluster")
+            # Notify if no cluster set
+            if feature_values["slurm_active"] and feature_values["token_name"] and len(feature_values["clusters"]) < 1:
+                log.warning(feature_values["token_name"] + " is slurm_active, but is not assigned any cluster")
 
-            statdat = os.stat(server["licence_file"]["path"])
-            file_name = server["licence_file"]["path"].split("/")[-1]
+        statdat = os.stat(server["licence_file"]["path"])
+        file_name = server["licence_file"]["path"].split("/")[-1]
 
-            owner = getpwuid(statdat.st_uid).pw_name
-            group = getgrgid(statdat.st_gid).gr_name
+        owner = getpwuid(statdat.st_uid).pw_name
+        group = getgrgid(statdat.st_gid).gr_name
 
-            # Check permissions of file
-            if statdat.st_mode == 432:
-                raise Exception(server["licence_file"]["path"] + " file address permissions look weird.")
+        # Check permissions of file
+        if statdat.st_mode == 432:
+            raise Exception(server["licence_file"]["path"] + " file address permissions look weird.")
 
-            if server["licence_file"]["group"] and group != server["licence_file"]["group"]:
-                log.warning(server["licence_file"]["path"] + ' group is "' + group + '", should be "' + server["licence_file"]["group"] + '".')
+        if server["licence_file"]["group"] and group != server["licence_file"]["group"]:
+            log.warning(server["licence_file"]["path"] + ' group is "' + group + '", should be "' + server["licence_file"]["group"] + '".')
 
-            if owner != settings["user"]:
-                log.warning(server["licence_file"]["path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
+        if owner != settings["user"]:
+            log.warning(server["licence_file"]["path"] + " owner is '" + owner + "', should be '" + settings["user"] + "'.")
 
-            # if ll_value["licence_file_path"] != standard_address and ll_value["software_name"] and ll_value["institution"]:
-            #     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
-            # Read lic file contents
-            with open(server["licence_file"]["path"]) as file:
-                sub_out = file.read()
-                match_address = poll_methods[server["server"]["poll_method"]]["details_pattern"].match(sub_out).groupdict()
-                if not server["server"]["address"]:
-                    server["server"]["address"] = match_address["server_address"]
-                elif server["server"]["address"] != match_address["server_address"]:
-                    log.warning(file_name + " address mismatch: " + server["server"]["address"] + " -> " + match_address["server_address"])
-                if not server["server"]["port"]:
-                    server["server"]["port"] = match_address["server_port"]
-                elif server["server"]["port"] != match_address["server_port"]:
-                    log.warning(file_name + " port mismatch: " + server["server"]["port"] + " -> " + match_address["server_port"])
-        except Exception as details:
-            log.error("'" + server["licence_file"]["path"] + " has an invalid file path attached: " + str(details))
-            server["server"]["polling_server"] = False
-            server["server"]["status"] = "INVALID"
+        # if ll_value["licence_file_path"] != standard_address and ll_value["software_name"] and ll_value["institution"]:
+        #     log.debug('Would be cool if "' + ll_value["licence_file_path"] + '" was "' + standard_address + '".')
+        # Read lic file contents
+        with open(server["licence_file"]["path"]) as file:
+            sub_out = file.read()
+            match_address = poll_methods[server["server"]["poll_method"]]["details_pattern"].match(sub_out).groupdict()
+            if not server["server"]["address"]:
+                server["server"]["address"] = match_address["server_address"]
+            elif server["server"]["address"] != match_address["server_address"]:
+                log.warning(file_name + " address mismatch: " + server["server"]["address"] + " -> " + match_address["server_address"])
+            if not server["server"]["port"]:
+                server["server"]["port"] = match_address["server_port"]
+            elif server["server"]["port"] != match_address["server_port"]:
+                log.warning(file_name + " port mismatch: " + server["server"]["port"] + " -> " + match_address["server_port"])
+        # except Exception as details:
+        #     log.error("'" + server["licence_file"]["path"] + " has an invalid file path attached: " + str(details))
+        #     server["server"]["polling_server"] = False
+        #     server["server"]["status"] = "INVALID"
 
     writemake_json(settings["path_store"], all_server_list)
 
