@@ -135,13 +135,13 @@ def validate():
                 # List of clusters, remove once checked.           
                 if token == feature_values["token_name"]:
 
-                    if values[3] != meta_total:
+                    if int(values[3]) != meta_total:
                         log.warning(token + " on " + values[6] + " has metatotal of " + str(values[3]) + " should have " + str(meta_total))
                         log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + " Count=" + str(meta_total))
 
-                    if values[4] != fraction:
+                    if int(values[4]) != fraction:
                         log.warning(token + " on " + values[6] + " has fraction of " + str(values[4]) + " should have " + str(fraction))
-                        log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + "Clusters=" + values[6] + " PercentAllowed=" + str(fraction))
+                        log.error("sacctmgr modify resource Name=" + values[0] + " Server=" + values[1] + " Clusters=" + values[6] + " PercentAllowed=" + str(fraction))
 
                     # If token from cluster not in list.
                     if values[6] not in clusters:
