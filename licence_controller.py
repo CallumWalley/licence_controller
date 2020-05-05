@@ -122,14 +122,14 @@ def validate():
                 if key not in feature_values:
                     log.info(feature + " missing property '" + key + "'. Setting to default.")
                     feature_values[key] = value
-                    
+
             # Copy dict name to value for backward comp.
             if not feature_values["feature_name"]:
                 feature_values["feature_name"]=feature
             # Compare with existing Tokens                        
             clusters = feature_values["clusters"].copy()
             num_clust=len(feature_values["clusters"])
-            meta_total=num_clust * feature_values["total"]
+            meta_total=math.ceil(feature_values["total"] / int(1/num_clust))
             fraction = int(100 / num_clust)
             
             for token, values in lic_ar.items():
@@ -150,6 +150,7 @@ def validate():
                     if values[6] not in clusters:
                         log.warning("slurm licence token assigned on cluster " + values[6] + " but not in licence controller")
                         break
+                    log.debug("Feature " + feature + " has cluster tokens " + ",".join(clusters) + "unnaccounted for.")
                     clusters.remove(values[6])
 
             if clusters:
