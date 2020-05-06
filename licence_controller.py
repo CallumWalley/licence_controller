@@ -457,7 +457,6 @@ def poll_remote(server):
                     lic_count = int(group_dic["count"])
                 else:
                     lic_count = 1
-
                 server["tracked_features"][group_dic["feature"]]["usage_all"] += lic_count
                 print(server["tracked_features"][group_dic["feature"]]["usage_all"])
 
@@ -471,6 +470,7 @@ def poll_remote(server):
                     server["tracked_features"][group_dic["feature"]]["usage_nesi"] += lic_count
                     server["tracked_features"][group_dic["feature"]]["users_nesi"][group_dic["user"]]["count"] += lic_count
                     server["tracked_features"][group_dic["feature"]]["users_nesi"][group_dic["user"]]["sockets"].append(match_cluster.group(0))
+                
             elif match_cluster:
                 log.info("Untracked feature: " + group_dic["feature"] + " being used by " + group_dic["user"] + " on " + group_dic["host"])
             elif group_dic["feature"] in server["untracked_features"]:
