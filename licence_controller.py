@@ -459,7 +459,7 @@ def poll_remote(server):
                     lic_count = 1
 
                 server["tracked_features"][group_dic["feature"]]["usage_all"] += lic_count
-                log.debug(server["tracked_features"][group_dic["feature"]]["usage_all"])
+                print(server["tracked_features"][group_dic["feature"]]["usage_all"])
 
                 # Count gets added regardless of socket
                 if match_cluster:
