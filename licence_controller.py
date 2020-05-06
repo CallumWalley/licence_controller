@@ -291,7 +291,7 @@ def get_nesi_use():
 
             # try:
             for line in scontrol_string_list:
-                log.debug(line)
+                #log.debug(line)
                 if len(line) < 6:
                     continue
                 line_delimited = line.split("|")
@@ -363,7 +363,7 @@ def poll_remote(server):
             # Read regex by line.
             for featureorline in featureanduser_re_match:
                 group_dic = featureorline.groupdict()
-                log.debug(json.dumps(group_dic))
+                #log.debug(json.dumps(group_dic))
                 # If this is the case, it is a feature header.
                 if group_dic["feature"] is not None:
                     if group_dic["feature"] in server["tracked_features"].keys():
@@ -389,7 +389,7 @@ def poll_remote(server):
 
                 # If this is the case, it is a user.
                 if group_dic["user"] is not None:
-                    log.debug(group_dic["user"] + " is a user")
+                    #log.debug(group_dic["user"] + " is a user")
                     match_cluster = cluster_pattern.match(group_dic["host"])
                     if tracked:
                         # Count gets added regardless of socket
@@ -459,10 +459,11 @@ def poll_remote(server):
                     lic_count = 1
 
                 server["tracked_features"][group_dic["feature"]]["usage_all"] += lic_count
+                log.debug(server["tracked_features"][group_dic["feature"]]["usage_all"])
 
                 # Count gets added regardless of socket
                 if match_cluster:
-                    log.debug(group_dic["user"] + " is a user")
+                    #log.debug(group_dic["user"] + " is a user")
                     # If user not already. Add them.
                     if group_dic["user"] not in server["tracked_features"][group_dic["feature"]]["users_nesi"]:
                         server["tracked_features"][group_dic["feature"]]["users_nesi"][group_dic["user"]] = {"count": 0, "tokens": 0, "sockets": [], "soak": 0}
