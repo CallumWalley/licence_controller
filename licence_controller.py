@@ -442,8 +442,6 @@ def poll_remote(server):
             tracked_feature["usage_nesi"] = 0
             tracked_feature["users_nesi"] = {}
 
-        # fine
-        #Frst is bleh
         for featureorline in featureanduser_re_match:
             group_dic = featureorline.groupdict()
             if not group_dic["feature"] or not group_dic["user"]:
