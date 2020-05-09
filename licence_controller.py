@@ -422,14 +422,16 @@ def poll_remote(server):
         sub_return = subprocess.check_output(shell_command_string, shell=True).strip().decode("utf-8", "replace")  # Removed .decode("utf-8") as threw error.
         log.debug(sub_return)
 
-        coarce_pattern=re.compile(r"FEATURENAME: (?P<feature>\S*)\n.*\n.*\n.*\n.*COUNT: (?P<total>\d*)\n.*USED: (?P<count>\d*)", flags=re.M)
-        fine_pattern = re.compile(r"(?P<user>[A-Za-z0-9]*)@(?P<host>\S*):\d*\s*(?P<date>[\d\/]*?) (?P<time>[\d\:]*)\s*(?P<feature>[a-zA-Z_]*)?[^\d]*(?P<count>\d*){1}\s*(?P<version>\S*)", flags=re.M)
+        coarce_pattern = re.compile(r"FEATURENAME: (?P<feature>\S*)\n.*\n.*\n.*\n.*COUNT: (?P<total>\d*)\n.*USED: (?P<count>\d*)", flags=re.M)
+        fine_pattern = re.compile(r"(?P<user>[A-Za-z0-9]*)@(?P<host>\S*):(?P<pid>\d*)\s*(?P<date>[\d\/]*?) (?P<time>[\d\:]*)\s*(?P<feature>[a-zA-Z_]*)?[^\d]*(?P<count>\d*){1}\s*(?P<version>\S*)", flags=re.M)
 
         #datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         server["server"]["status"] = "UP" #server_re_match_group["last_stat"]
         server["server"]["version"] = ""
-        #log.info("'" + server["server"]["address"] + "' " + server_re_match_group["last_stat"])
-        # server["server"]["last_time"]=server_re_match_group["last_time"]
+
+        # Because ANSYS hates me, ansli_util occasionally records the same licence being used multiple times. 
+        # Track PID list <pid><lic> discard duplicates.
+        pidpluslic_list=[]
 
         featureanduser_re_match = fine_pattern.finditer(sub_return)
         if len(server["tracked_features"].keys()) < 1:
@@ -446,20 +448,30 @@ def poll_remote(server):
             group_dic = featureorline.groupdict()
             if not group_dic["feature"] or not group_dic["user"]:
                 continue
+
             # If this is the case, it is a feature header.
             match_cluster = cluster_pattern.match(group_dic["host"])
+
+            # if duplicate, skip.
+            if group_dic["feature"]+group_dic["feature"] in pidpluslic_list:
+                log.debug("Duplicate licence entry.")
+                continue
+            else:
+                pidpluslic_list.append(group_dic["feature"]+group_dic["feature"])
+
             log.debug(json.dumps(group_dic))
 
             if group_dic["feature"] in server["tracked_features"].keys():
 
                 log.debug(group_dic["feature"] + " is tracked feature")
+                
                 # Count gets added regardless of socket
                 if "count" in group_dic and group_dic["count"].isdigit():
                     lic_count = int(group_dic["count"])
                 else:
                     lic_count = 1
                 server["tracked_features"][group_dic["feature"]]["usage_all"] += lic_count
-                print(server["tracked_features"][group_dic["feature"]]["usage_all"])
+                #print(server["tracked_features"][group_dic["feature"]]["usage_all"])
 
                 # Count gets added regardless of socket
                 if match_cluster:
