@@ -1,5 +1,5 @@
 {
-    "squeue_poll_period": 20,
+    "squeue_poll_period": 60,
     "redraw_dash_period": 20,
     "default_path": "/opt/nesi/%(cluster)s/%(software)s/Licenses/$(institution)s_%(faculy)s.lic",
     "user": "nesi-apps-admin",
