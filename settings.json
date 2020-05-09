@@ -1,0 +1,99 @@
+{
+    "squeue_poll_period": 20,
+    "redraw_dash_period": 20,
+    "default_path": "/opt/nesi/%(cluster)s/%(software)s/Licenses/$(institution)s_%(faculy)s.lic",
+    "user": "nesi-apps-admin",
+    "point_weight": 0.01,
+    "history_points": 3,
+    "path_meta": "meta.json",
+    "path_store": "cache/licence_list.json",
+    "path_modulelist": "../module_tracker/module_list.json",
+    "fix_slurm_share": true,
+    "fix_slurm_count": true,
+    "check_user": true,
+    "loglevel": "info",
+    "validate": true,
+    "soak": true,
+    "prom_port":8860,
+    "default_server": {
+        "software_name": "",
+        "institution": "",
+        "faculty": "",
+        "server": {
+            "poll_method": "",
+            "host_id": "",
+            "name": "",
+            "address": "",
+            "status": "UNKNOWN",
+            "last_time": "NEVER",
+            "version": "UNKNOWN",
+            "port": "27000",
+            "type": "",
+            "daemon": "",
+	    "poll_time":0,
+            "poll_period": 30,
+            "polling_server": true
+        },
+        "licence_file": {
+            "path": "",
+            "group": ""
+        },
+        "tracked_features": {},
+        "untracked_features": []
+    },
+    "default_feature": {
+        "feature_name": "",
+        "use_conditions": "",
+        "usage_formula":"",
+        "token_name": "",
+        "slurm_active": true,
+        "visible_on_docs": true,
+        "slurm_blocked":false,
+        "clusters": [],
+        "buffer_constant":1,
+        "total": 0,
+        "usage_all": 0,
+        "usage_nesi": 0,
+        "token_usage": 0,
+        "token_soak": 0,
+        "users_nesi": {},
+        "history": [
+            0,
+            0,
+            0
+        ],
+        "hourly_averages": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ]
+    },
+    "clusters": {
+        "mahuika": {
+            "enabled": true
+        },
+        "maui": {},
+        "maui_ancil": {}
+    }
+}
