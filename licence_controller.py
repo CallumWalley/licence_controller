@@ -490,6 +490,8 @@ def poll_remote(server):
                 server["untracked_features"].append(group_dic["feature"])
                 log.info("'" + group_dic["feature"] + "' being added to untracked features.")
 
+
+        log.debug(str(pidpluslic_list))
         #shell_command_string = "export ANSYSLMD_LICENSE_FILE=$(head -n 1 " + server["licence_file"]["path"] + " | sed -n -e 's/.*=//p');linx64/ansysli_util -liusage"
         # Read regex by line.
         # Coarse
