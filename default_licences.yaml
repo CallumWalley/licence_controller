@@ -1,0 +1,39 @@
+- faculty_short: "" # e.g "foe"
+  faculty_long: ""  # e.g "Faculty of Engineering"
+  institution_short: "" # e.g "uoa"
+  institution_long: "" # e.g "University of Auckland"
+  licence_file:
+    group: "unset"       
+    path: "unset"       # Path to flexlm file should be '/opt/nesi/share{software_name}/Licenses/{institution_short}_{faculty_short}.lic'
+  server:               # Most of this doesn't need to be set.
+    address: "unset"    # Address/CNAME
+    daemon: "unset"
+    host_id: "unset"
+    name: "unset"       # Name of server
+    poll_method: "lmutil"   # What function to use. As in 'poll_methods.py'
+    poll_period: 300
+    polling_server: false  # Whether to poll server.
+    port: 2900
+    type: "FLEXlm"
+    version: "unset"
+  software_name: "unset" # Software name as per lmod.
+  tracked_features: # An example feature
+    example-feature:
+      buffer_constant: 1 # Always keep this many licences free.
+      buffer_constant_other: 0 # Always keep this many licences free for OTHER people.
+      allowed_clusters:
+      - "mahuika"
+      - "maui"
+      - "maui-ancil"
+      feature_name: "example-feature" # As in flexLM (also should be feature name)
+      hourly_averages: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ] # Average usage by hour
+      slurm_token_name: "unset@unset" # Format should be {feature_name}@{institution_short}_{faculty-short}
+      slurm_track: true   # Whether to record usage of slurm licence tokens.
+      slurm_soak: false   # Whether to create a reservation for these licences.
+      slurm_block: false  # Reserve ALL licences if server cannot be contacted.
+      track_users: true   # Whether to record users.
+      total: 0
+      usage_formula: 1*{cpu}  # Owner specified limitations. $cpu $node 
+      use_conditions: ""      # Owner specified limitations.
+      visible_on_docs: true   # Is this licence displayed on the nesi documentation?
+  untracked_features: [] # List of features to ignore.
